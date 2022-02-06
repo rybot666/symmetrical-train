@@ -1,0 +1,4 @@
+name: SymmetricalTrain
+version: '${version}'
+main: io.github.rybot666.symmetricaltrain.SymmetricalTrain
+api-version: 1.18
