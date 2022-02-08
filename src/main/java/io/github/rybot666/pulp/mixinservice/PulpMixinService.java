@@ -32,12 +32,12 @@ public class PulpMixinService extends MixinServiceAbstract {
     }
 
     @Override
-    public IClassProvider getClassProvider() {
+    public PulpClassProvider getClassProvider() {
         return this.classProvider;
     }
 
     @Override
-    public IClassBytecodeProvider getBytecodeProvider() {
+    public PulpClassProvider getBytecodeProvider() {
         return this.classProvider;
     }
 

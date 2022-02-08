@@ -39,8 +39,24 @@ public class PulpClassProvider implements IClassProvider, IClassBytecodeProvider
 
     @Override
     public ClassNode getClassNode(String name) throws ClassNotFoundException, IOException {
+        ClassReader reader = this.getClassReader(name);
+
+        ClassNode node = new ClassNode();
+        reader.accept(node, ClassReader.EXPAND_FRAMES);
+
+        return node;
+    }
+
+    @Override
+    public ClassNode getClassNode(String name, boolean runTransformers) throws ClassNotFoundException, IOException {
+        // TODO: handle transformers?
+        return getClassNode(name);
+    }
+
+    public ClassReader getClassReader(String name) throws ClassNotFoundException, IOException {
         InputStream classStream = null;
         ClassReader reader;
+
         try {
             final String resourcePath = name.replace('.', '/').concat(".class");
             classStream = this.service.getResourceAsStream(resourcePath);
@@ -53,15 +69,6 @@ public class PulpClassProvider implements IClassProvider, IClassBytecodeProvider
             Closeables.closeQuietly(classStream);
         }
 
-        ClassNode node = new ClassNode();
-        reader.accept(node, ClassReader.EXPAND_FRAMES);
-
-        return node;
-    }
-
-    @Override
-    public ClassNode getClassNode(String name, boolean runTransformers) throws ClassNotFoundException, IOException {
-        // TODO: handle transformers?
-        return getClassNode(name);
+        return reader;
     }
 }
