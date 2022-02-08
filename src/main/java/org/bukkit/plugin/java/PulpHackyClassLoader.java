@@ -11,7 +11,7 @@ import java.util.List;
  *
  * Placed here for repackaging hack on `PluginClassLoader` and its methods
  */
-public class HackyPluginClassLoader extends URLClassLoader {
+public class PulpHackyClassLoader extends URLClassLoader {
     private static final VarHandle LOADERS_HANDLE;
     private final JavaPluginLoader loader;
 
@@ -20,11 +20,11 @@ public class HackyPluginClassLoader extends URLClassLoader {
             LOADERS_HANDLE = MethodHandles.privateLookupIn(JavaPluginLoader.class, MethodHandles.lookup())
                     .findVarHandle(JavaPluginLoader.class, "loaders", List.class);
         } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Failed to get plugin loader `loaders` handle", e);
+            throw new RuntimeException("Failed to get the `loaders` var handle of `JavaPluginLoader`", e);
         }
     }
 
-    public HackyPluginClassLoader(ClassLoader parent, JavaPluginLoader loader) {
+    public PulpHackyClassLoader(ClassLoader parent, JavaPluginLoader loader) {
         super(new URL[0], parent);
 
         this.loader = loader;

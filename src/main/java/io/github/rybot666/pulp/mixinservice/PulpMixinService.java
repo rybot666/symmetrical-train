@@ -1,7 +1,8 @@
-package io.github.rybot666.symmetricaltrain.mixinbackend;
+package io.github.rybot666.pulp.mixinservice;
 
-import io.github.rybot666.symmetricaltrain.SymmetricalTrain;
-import org.bukkit.plugin.java.HackyPluginClassLoader;
+import io.github.rybot666.pulp.PulpPlugin;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.PulpHackyClassLoader;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.service.*;
@@ -9,18 +10,20 @@ import org.spongepowered.asm.service.*;
 import java.io.InputStream;
 import java.util.Collection;
 
-public class MixinService extends MixinServiceAbstract {
-    final HackyPluginClassLoader loader;
-    private final ClassProvider classProvider;
+public class PulpMixinService extends MixinServiceAbstract {
+    public static final String NAME = PulpPlugin.NAME.concat("/").concat(Bukkit.getName());
 
-    public MixinService(SymmetricalTrain owner) {
-        this.loader = new HackyPluginClassLoader(this.getClass().getClassLoader(), (JavaPluginLoader) owner.getPluginLoader());
-        this.classProvider = new ClassProvider(this);
+    final PulpHackyClassLoader hackyClassLoader;
+    private final PulpClassProvider classProvider;
+
+    public PulpMixinService(PulpPlugin owner) {
+        this.hackyClassLoader = new PulpHackyClassLoader(this.getClass().getClassLoader(), (JavaPluginLoader) owner.getPluginLoader());
+        this.classProvider = new PulpClassProvider(this);
     }
 
     @Override
     public String getName() {
-        return "SymmetricalTrain";
+        return PulpMixinService.NAME;
     }
 
     @Override
@@ -65,6 +68,6 @@ public class MixinService extends MixinServiceAbstract {
 
     @Override
     public InputStream getResourceAsStream(String name) {
-        return null;
+        return this.hackyClassLoader.getResourceAsStream(name);
     }
 }

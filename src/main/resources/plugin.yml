@@ -1,4 +1,4 @@
-name: SymmetricalTrain
+name: Pulp
 version: '${version}'
-main: io.github.rybot666.symmetricaltrain.SymmetricalTrain
+main: io.github.rybot666.symmetricaltrain.PulpPlugin
 api-version: 1.18
