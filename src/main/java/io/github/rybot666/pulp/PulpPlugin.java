@@ -1,6 +1,5 @@
 package io.github.rybot666.pulp;
 
-import io.github.rybot666.pulp.mixinservice.PulpMixinService;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -12,8 +11,6 @@ public final class PulpPlugin extends JavaPlugin {
 
     private static boolean hasInitialised = false;
 
-    private PulpMixinService mixinService;
-
     @Override
     public void onEnable() {
         // using /reload will break everything
@@ -22,7 +19,5 @@ public final class PulpPlugin extends JavaPlugin {
         }
 
         PulpPlugin.hasInitialised = true;
-
-        this.mixinService = new PulpMixinService(this);
     }
 }
