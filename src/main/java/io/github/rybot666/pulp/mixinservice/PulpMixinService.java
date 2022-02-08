@@ -4,6 +4,8 @@ import io.github.rybot666.pulp.PulpPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
+import org.spongepowered.asm.logging.ILogger;
+import org.spongepowered.asm.logging.LoggerAdapterJava;
 import org.spongepowered.asm.service.*;
 
 import java.io.InputStream;
@@ -68,5 +70,10 @@ public class PulpMixinService extends MixinServiceAbstract {
     @Override
     public InputStream getResourceAsStream(String name) {
         return this.hackyClassLoader.getResourceAsStream(name);
+    }
+
+    @Override
+    protected ILogger createLogger(String name) {
+        return new LoggerAdapterJava("Mixin");
     }
 }
