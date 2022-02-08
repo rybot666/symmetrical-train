@@ -2,7 +2,6 @@ package io.github.rybot666.pulp.mixinservice;
 
 import io.github.rybot666.pulp.PulpPlugin;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.java.PulpHackyClassLoader;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.service.*;
