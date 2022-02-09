@@ -4,10 +4,12 @@ import net.bytebuddy.agent.ByteBuddyAgent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.lang.instrument.Instrumentation;
+import java.util.logging.Logger;
 
 public final class PulpPlugin extends JavaPlugin {
     public static final String NAME = "Pulp";
     public static final Instrumentation INSTRUMENTATION = ByteBuddyAgent.install();
+    public static final Logger LOGGER = Logger.getLogger(NAME);
 
     private static boolean hasInitialised = false;
 

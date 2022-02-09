@@ -1,6 +1,7 @@
 package io.github.rybot666.pulp.mixinservice;
 
 import com.google.common.io.Closeables;
+import io.github.rybot666.pulp.util.Util;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.service.IClassBytecodeProvider;
@@ -39,36 +40,12 @@ public class PulpClassProvider implements IClassProvider, IClassBytecodeProvider
 
     @Override
     public ClassNode getClassNode(String name) throws ClassNotFoundException, IOException {
-        ClassReader reader = this.getClassReader(name);
-
-        ClassNode node = new ClassNode();
-        reader.accept(node, ClassReader.EXPAND_FRAMES);
-
-        return node;
+        return Util.readNode(Util.getClassReader(this.service.hackyClassLoader, name));
     }
 
     @Override
     public ClassNode getClassNode(String name, boolean runTransformers) throws ClassNotFoundException, IOException {
         // TODO: handle transformers?
         return getClassNode(name);
-    }
-
-    public ClassReader getClassReader(String name) throws ClassNotFoundException, IOException {
-        InputStream classStream = null;
-        ClassReader reader;
-
-        try {
-            final String resourcePath = name.replace('.', '/').concat(".class");
-            classStream = this.service.getResourceAsStream(resourcePath);
-            if (classStream == null) {
-                throw new ClassNotFoundException(name);
-            }
-            reader = new ClassReader(classStream);
-        } finally {
-            //noinspection UnstableApiUsage
-            Closeables.closeQuietly(classStream);
-        }
-
-        return reader;
     }
 }
