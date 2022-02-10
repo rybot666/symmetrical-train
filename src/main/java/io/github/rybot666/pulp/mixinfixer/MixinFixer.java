@@ -20,6 +20,20 @@ public class MixinFixer {
         this.fixerContext = fixerContext;
     }
 
+    private void registerClassHandleType(ClassNode clazz, Type type) {
+        boolean isInterface;
+        if (type.getSort() == Type.OBJECT) {
+            isInterface = fixerContext.isInterface(type.getInternalName());
+        } else if (type.getSort() == Type.ARRAY) {
+            isInterface = fixerContext.isInterface(type.getElementType().getInternalName());
+        } else {
+            return;
+        }
+        if (isInterface) {
+            classesUsingInterface.computeIfAbsent(type.getInternalName(), k -> ConcurrentHashMap.newKeySet()).add(clazz.name);
+        }
+    }
+
     public void registerClass(ClassNode clazz) {
         if (clazz.interfaces != null) {
             for (String itf : clazz.interfaces) {
@@ -28,54 +42,46 @@ public class MixinFixer {
         }
         if (clazz.methods != null) {
             for (MethodNode method : clazz.methods) {
-                method.accept(new MethodVisitor(ASM.API_VERSION) {
-                    private void handleType(Type type) {
-                        boolean isInterface;
-                        if (type.getSort() == Type.OBJECT) {
-                            isInterface = fixerContext.isInterface(type.getInternalName());
-                        } else if (type.getSort() == Type.ARRAY) {
-                            isInterface = fixerContext.isInterface(type.getElementType().getInternalName());
-                        } else {
-                            return;
-                        }
-                        if (isInterface) {
-                            classesUsingInterface.computeIfAbsent(type.getInternalName(), k -> ConcurrentHashMap.newKeySet()).add(clazz.name);
-                        }
-                    }
+                Type methodType = Type.getMethodType(method.desc);
+                for (Type type : methodType.getArgumentTypes()) {
+                    registerClassHandleType(clazz, type);
+                }
+                registerClassHandleType(clazz, methodType.getReturnType());
 
+                method.accept(new MethodVisitor(ASM.API_VERSION) {
                     @Override
                     public void visitTypeInsn(int opcode, String type) {
-                        handleType(Type.getObjectType(type));
+                        registerClassHandleType(clazz, Type.getObjectType(type));
                     }
 
                     @Override
                     public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
-                        handleType(Type.getObjectType(owner));
-                        handleType(Type.getType(descriptor));
+                        registerClassHandleType(clazz, Type.getObjectType(owner));
+                        registerClassHandleType(clazz, Type.getType(descriptor));
                     }
 
                     @Override
                     public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-                        handleType(Type.getObjectType(owner));
+                        registerClassHandleType(clazz, Type.getObjectType(owner));
                         Type methodType = Type.getMethodType(descriptor);
                         for (Type argType : methodType.getArgumentTypes()) {
-                            handleType(argType);
+                            registerClassHandleType(clazz, argType);
                         }
-                        handleType(methodType.getReturnType());
+                        registerClassHandleType(clazz, methodType.getReturnType());
                     }
 
                     @Override
                     public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
                         Type methodType = Type.getMethodType(descriptor);
                         for (Type argType : methodType.getArgumentTypes()) {
-                            handleType(argType);
+                            registerClassHandleType(clazz, argType);
                         }
-                        handleType(methodType.getReturnType());
+                        registerClassHandleType(clazz, methodType.getReturnType());
                     }
 
                     @Override
                     public void visitMultiANewArrayInsn(String descriptor, int numDimensions) {
-                        handleType(Type.getType(descriptor));
+                        registerClassHandleType(clazz, Type.getType(descriptor));
                     }
                 });
             }
