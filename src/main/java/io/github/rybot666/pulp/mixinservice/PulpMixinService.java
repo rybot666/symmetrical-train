@@ -5,6 +5,8 @@ import io.github.rybot666.pulp.instrumentation.ClassLoadWatchTransformer;
 import io.github.rybot666.pulp.mixinfixer.MixinFixer;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginLoader;
+import org.bukkit.plugin.SimplePluginManager;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
@@ -12,23 +14,46 @@ import org.spongepowered.asm.logging.LoggerAdapterJava;
 import org.spongepowered.asm.service.*;
 
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 public class PulpMixinService extends MixinServiceAbstract {
     public static final String NAME = PulpPlugin.NAME.concat("/").concat(Bukkit.getName());
+    private static final String JAVA_PLUGIN_LOADER_PATTERN = "\\.jar$";
 
     final PulpHackyClassLoader hackyClassLoader;
     private final PulpClassProvider classProvider;
     private final MixinFixer fixer;
 
     public PulpMixinService() {
-        Plugin owner = Bukkit.getPluginManager().getPlugin(PulpPlugin.NAME);
-        assert owner != null;
-        this.hackyClassLoader = new PulpHackyClassLoader(this.getClass().getClassLoader(), (JavaPluginLoader) owner.getPluginLoader());
+        this.hackyClassLoader = new PulpHackyClassLoader(this.getClass().getClassLoader(), getPluginLoader());
         this.classProvider = new PulpClassProvider(this);
         this.fixer = new MixinFixer(new PulpMixinFixerContext(this));
 
         ClassLoadWatchTransformer.register(PulpPlugin.INSTRUMENTATION, this.fixer::registerClass);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static JavaPluginLoader getPluginLoader() {
+        try {
+            SimplePluginManager manager = ((SimplePluginManager) Bukkit.getPluginManager());
+
+            Field fileAssociationsField = SimplePluginManager.class.getDeclaredField("fileAssociations");
+            fileAssociationsField.setAccessible(true);
+            Map<Pattern, PluginLoader> fileAssociations = (Map<Pattern, PluginLoader>) fileAssociationsField.get(manager);
+
+            for (Map.Entry<Pattern, PluginLoader> entry : fileAssociations.entrySet()) {
+                if (entry.getKey().pattern().equals(JAVA_PLUGIN_LOADER_PATTERN)) {
+                    return (JavaPluginLoader) entry.getValue();
+                }
+            }
+
+            throw new AssertionError("Couldn't find JavaPluginLoader in file associations");
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to reflect JavaPluginLoader", e);
+        }
     }
 
     @Override
