@@ -4,6 +4,7 @@ import io.github.rybot666.pulp.PulpPlugin;
 import io.github.rybot666.pulp.instrumentation.ClassLoadWatchTransformer;
 import io.github.rybot666.pulp.mixinfixer.MixinFixer;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
@@ -20,7 +21,9 @@ public class PulpMixinService extends MixinServiceAbstract {
     private final PulpClassProvider classProvider;
     private final MixinFixer fixer;
 
-    public PulpMixinService(PulpPlugin owner) {
+    public PulpMixinService() {
+        Plugin owner = Bukkit.getPluginManager().getPlugin(PulpPlugin.NAME);
+        assert owner != null;
         this.hackyClassLoader = new PulpHackyClassLoader(this.getClass().getClassLoader(), (JavaPluginLoader) owner.getPluginLoader());
         this.classProvider = new PulpClassProvider(this);
         this.fixer = new MixinFixer(new PulpMixinFixerContext(this));
