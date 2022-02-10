@@ -25,7 +25,8 @@ public class MixinFixer {
         if (type.getSort() == Type.OBJECT) {
             isInterface = fixerContext.isInterface(type.getInternalName());
         } else if (type.getSort() == Type.ARRAY) {
-            isInterface = fixerContext.isInterface(type.getElementType().getInternalName());
+            Type elementType = type.getElementType();
+            isInterface = elementType.getSort() == Type.OBJECT && fixerContext.isInterface(elementType.getInternalName());
         } else {
             return;
         }

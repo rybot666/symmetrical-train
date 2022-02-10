@@ -1,6 +1,5 @@
 package io.github.rybot666.pulp.mixinservice;
 
-import io.github.rybot666.pulp.PulpPlugin;
 import io.github.rybot666.pulp.mixinfixer.IMixinFixerContext;
 import io.github.rybot666.pulp.util.Util;
 import org.objectweb.asm.ClassReader;
@@ -24,7 +23,7 @@ public class PulpMixinFixerContext implements IMixinFixerContext {
     public boolean isInterface(String internalName) {
         try {
             ClassReader reader = Util.getClassReader(this.service.hackyClassLoader, internalName);
-            return (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0;
+            return reader != null && (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0;
         } catch (ClassNotFoundException | IOException ignored) {}
 
         return false;
