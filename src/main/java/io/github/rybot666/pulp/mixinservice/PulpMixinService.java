@@ -3,6 +3,7 @@ package io.github.rybot666.pulp.mixinservice;
 import io.github.rybot666.pulp.PulpPlugin;
 import io.github.rybot666.pulp.instrumentation.ClassLoadWatchTransformer;
 import io.github.rybot666.pulp.mixinfixer.MixinFixer;
+import io.github.rybot666.pulp.util.LoggerAdapterPulp;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.SimplePluginManager;
@@ -119,6 +120,6 @@ public class PulpMixinService extends MixinServiceAbstract {
 
     @Override
     protected ILogger createLogger(String name) {
-        return new LoggerAdapterJava("Mixin");
+        return new LoggerAdapterPulp("Mixin");
     }
 }
