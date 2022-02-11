@@ -37,7 +37,11 @@ public class PulpClassProvider implements IClassProvider, IClassBytecodeProvider
 
     @Override
     public ClassNode getClassNode(String name) throws ClassNotFoundException, IOException {
-        return Util.readNode(Util.getClassReader(this.service.hackyClassLoader, name));
+        ClassReader classReader = Util.getClassReader(this.service.hackyClassLoader, name);
+        if (classReader == null) {
+            throw new ClassNotFoundException(name);
+        }
+        return Util.readNode(classReader);
     }
 
     @Override

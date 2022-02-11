@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.SimplePluginManager;
 import org.bukkit.plugin.java.JavaPluginLoader;
+import org.spongepowered.asm.launch.platform.container.ContainerHandleURI;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
 import org.spongepowered.asm.logging.LoggerAdapterJava;
@@ -17,7 +18,9 @@ import org.spongepowered.asm.service.MixinServiceAbstract;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.net.URISyntaxException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -28,11 +31,17 @@ public class PulpMixinService extends MixinServiceAbstract {
     final PulpHackyClassLoader hackyClassLoader;
     private final PulpClassProvider classProvider;
     private final MixinFixer fixer;
+    private final IContainerHandle primaryContainer;
 
     public PulpMixinService() {
         this.hackyClassLoader = new PulpHackyClassLoader(this.getClass().getClassLoader(), getPluginLoader());
         this.classProvider = new PulpClassProvider(this);
         this.fixer = new MixinFixer(new PulpMixinFixerContext(this));
+        try {
+            this.primaryContainer = new ContainerHandleURI(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
 
         ClassLoadWatchTransformer.register(PulpPlugin.INSTRUMENTATION, this.fixer::registerClass);
     }
@@ -95,12 +104,12 @@ public class PulpMixinService extends MixinServiceAbstract {
 
     @Override
     public Collection<String> getPlatformAgents() {
-        return null;
+        return Collections.emptyList();
     }
 
     @Override
     public IContainerHandle getPrimaryContainer() {
-        return null;
+        return primaryContainer;
     }
 
     @Override

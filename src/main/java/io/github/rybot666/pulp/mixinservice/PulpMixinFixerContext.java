@@ -23,7 +23,7 @@ public class PulpMixinFixerContext implements IMixinFixerContext {
     public boolean isInterface(String internalName) {
         try {
             ClassReader reader = Util.getClassReader(this.service.hackyClassLoader, internalName);
-            return (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0;
+            return reader != null && (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0;
         } catch (ClassNotFoundException | IOException ignored) {}
 
         return false;

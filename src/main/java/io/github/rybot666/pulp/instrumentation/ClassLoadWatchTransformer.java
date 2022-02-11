@@ -36,17 +36,27 @@ public class ClassLoadWatchTransformer implements ClassFileTransformer {
         ClassLoadWatchTransformer transformer = new ClassLoadWatchTransformer(consumer);
         instrumentation.addTransformer(transformer, false);
 
-        for (Class<?> clazz : instrumentation.getAllLoadedClasses()) {
-            String internalName = clazz.getName().replace('.', '/').concat(".class");
+        Class<?>[] allLoadedClasses = instrumentation.getAllLoadedClasses();
+        for (int i = 0; i < allLoadedClasses.length; i++) {
+            PulpPlugin.LOGGER.log(Level.INFO, String.format("Processing loaded class %d/%d : %s", i + 1, allLoadedClasses.length, allLoadedClasses[i].getName()));
+            Class<?> clazz = allLoadedClasses[i];
+            if (clazz.isArray() || clazz.isPrimitive()) {
+                continue;
+            }
             try {
-                ClassReader reader = Util.getClassReader(clazz.getClassLoader(), internalName);
+                ClassReader reader = Util.getClassReader(clazz.getClassLoader(), clazz.getName());
+                if (reader == null) {
+                    continue;
+                }
                 ClassNode node = Util.readNode(reader);
 
                 consumer.accept(node);
             } catch (ClassNotFoundException e) {
-                PulpPlugin.LOGGER.log(Level.WARNING, String.format("Missing expected class \"%s\"", clazz.getName()), e);
+                PulpPlugin.LOGGER.log(Level.WARNING, String.format("Missing expected class \"%s\"", clazz.getName()),
+                        e);
             } catch (IOException e) {
-                PulpPlugin.LOGGER.log(Level.WARNING, String.format("Failed to read class data for class \"%s\"", clazz.getName()), e);
+                PulpPlugin.LOGGER.log(Level.WARNING, String.format("Failed to read class data for class \"%s\"",
+                        clazz.getName()), e);
             }
         }
 
