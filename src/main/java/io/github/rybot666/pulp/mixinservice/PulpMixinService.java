@@ -4,14 +4,16 @@ import io.github.rybot666.pulp.PulpPlugin;
 import io.github.rybot666.pulp.instrumentation.ClassLoadWatchTransformer;
 import io.github.rybot666.pulp.mixinfixer.MixinFixer;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.SimplePluginManager;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
 import org.spongepowered.asm.logging.LoggerAdapterJava;
-import org.spongepowered.asm.service.*;
+import org.spongepowered.asm.service.IClassTracker;
+import org.spongepowered.asm.service.IMixinAuditTrail;
+import org.spongepowered.asm.service.ITransformerProvider;
+import org.spongepowered.asm.service.MixinServiceAbstract;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;

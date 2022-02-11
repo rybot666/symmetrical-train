@@ -1,6 +1,5 @@
 package io.github.rybot666.pulp.mixinservice;
 
-import io.github.rybot666.pulp.PulpPlugin;
 import io.github.rybot666.pulp.mixinfixer.IMixinFixerContext;
 import io.github.rybot666.pulp.util.Util;
 import org.objectweb.asm.ClassReader;

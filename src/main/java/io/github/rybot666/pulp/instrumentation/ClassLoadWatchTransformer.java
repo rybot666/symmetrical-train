@@ -4,7 +4,6 @@ import io.github.rybot666.pulp.PulpPlugin;
 import io.github.rybot666.pulp.util.Util;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.util.asm.ASM;
 
 import java.io.IOException;
 import java.lang.instrument.ClassFileTransformer;
@@ -12,7 +11,6 @@ import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
 import java.util.function.Consumer;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Transformer to watch for classes being loaded or redefined
