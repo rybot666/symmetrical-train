@@ -15,17 +15,29 @@ public class MixinFixer {
     private final IMixinFixerContext fixerContext;
     private final Map<String, Set<String>> classesImplementingInterface = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> classesUsingInterface = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> isInterfaceCache = new ConcurrentHashMap<>();
 
     public MixinFixer(IMixinFixerContext fixerContext) {
         this.fixerContext = fixerContext;
     }
 
+    private boolean isInterface(String internalName) {
+        if (this.isInterfaceCache.containsKey(internalName)) {
+            return this.isInterfaceCache.get(internalName);
+        }
+
+        boolean isInterface = this.fixerContext.isInterface(internalName);
+        this.isInterfaceCache.put(internalName, isInterface);
+
+        return isInterface;
+    }
+
     private void registerClassHandleType(ClassNode clazz, Type type) {
         boolean isInterface;
         if (type.getSort() == Type.OBJECT) {
-            isInterface = fixerContext.isInterface(type.getInternalName());
+            isInterface = this.isInterface(type.getInternalName());
         } else if (type.getSort() == Type.ARRAY) {
-            isInterface = fixerContext.isInterface(type.getElementType().getInternalName());
+            isInterface = this.isInterface(type.getElementType().getInternalName());
         } else {
             return;
         }
