@@ -1,7 +1,6 @@
 package io.github.rybot666.pulp.mixinservice;
 
 import io.github.rybot666.pulp.PulpPlugin;
-import io.github.rybot666.pulp.instrumentation.ClassLoadWatchTransformer;
 import io.github.rybot666.pulp.mixinfixer.MixinFixer;
 import io.github.rybot666.pulp.util.LoggerAdapterPulp;
 import org.bukkit.Bukkit;
@@ -11,11 +10,9 @@ import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.ContainerHandleURI;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
-import org.spongepowered.asm.logging.LoggerAdapterJava;
-import org.spongepowered.asm.service.IClassTracker;
-import org.spongepowered.asm.service.IMixinAuditTrail;
-import org.spongepowered.asm.service.ITransformerProvider;
-import org.spongepowered.asm.service.MixinServiceAbstract;
+import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
+import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory;
+import org.spongepowered.asm.service.*;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -30,9 +27,11 @@ public class PulpMixinService extends MixinServiceAbstract {
     private static final String JAVA_PLUGIN_LOADER_PATTERN = "\\.jar$";
 
     final PulpHackyClassLoader hackyClassLoader;
+    final MixinFixer fixer;
+    IMixinTransformer transformer;
     private final PulpClassProvider classProvider;
-    private final MixinFixer fixer;
     private final IContainerHandle primaryContainer;
+    private final PulpTransformer pulpTransformer;
 
     public PulpMixinService() {
         this.hackyClassLoader = new PulpHackyClassLoader(this.getClass().getClassLoader(), getPluginLoader());
@@ -44,7 +43,7 @@ public class PulpMixinService extends MixinServiceAbstract {
             throw new RuntimeException(e);
         }
 
-        ClassLoadWatchTransformer.register(PulpPlugin.INSTRUMENTATION, this.fixer::registerClass);
+        this.pulpTransformer = PulpTransformer.register(PulpPlugin.INSTRUMENTATION, this);
     }
 
     @SuppressWarnings("unchecked")
@@ -121,5 +120,12 @@ public class PulpMixinService extends MixinServiceAbstract {
     @Override
     protected ILogger createLogger(String name) {
         return new LoggerAdapterPulp("Mixin");
+    }
+
+    @Override
+    public void offer(IMixinInternal internal) {
+        if (internal instanceof IMixinTransformerFactory) {
+            this.transformer = ((IMixinTransformerFactory) internal).createTransformer();
+        }
     }
 }

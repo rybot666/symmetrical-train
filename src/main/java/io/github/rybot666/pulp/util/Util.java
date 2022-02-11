@@ -4,7 +4,9 @@ import com.google.common.io.Closeables;
 import io.github.rybot666.pulp.PulpPlugin;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.transformers.MixinClassWriter;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,5 +43,21 @@ public class Util {
         }
 
         return reader;
+    }
+
+    public static ClassNode readNode(byte[] data) {
+        ClassReader reader = new ClassReader(data);
+        ClassNode node = new ClassNode();
+
+        reader.accept(node, ClassReader.EXPAND_FRAMES);
+
+        return node;
+    }
+
+    public static byte[] writeNode(ClassNode node) {
+        ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        node.accept(writer);
+
+        return writer.toByteArray();
     }
 }

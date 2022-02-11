@@ -1,39 +1,43 @@
-package io.github.rybot666.pulp.instrumentation;
+package io.github.rybot666.pulp.mixinservice;
 
 import io.github.rybot666.pulp.PulpPlugin;
 import io.github.rybot666.pulp.util.Util;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 
 import java.io.IOException;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 
-/**
- * Transformer to watch for classes being loaded or redefined
- */
-public class ClassLoadWatchTransformer implements ClassFileTransformer {
-    private final Consumer<ClassNode> consumer;
+public class PulpTransformer implements ClassFileTransformer {
+    private final PulpMixinService owner;
 
-    public ClassLoadWatchTransformer(Consumer<ClassNode> consumer) {
-        this.consumer = consumer;
+    public PulpTransformer(PulpMixinService owner) {
+        this.owner = owner;
     }
 
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
-        ClassReader reader = new ClassReader(classfileBuffer);
-        ClassNode node = Util.readNode(reader);
+        ClassNode untransformed = Util.readNode(classfileBuffer);
+        ClassNode transformed = new ClassNode();
+        untransformed.accept(transformed);
 
-        this.consumer.accept(node);
+        this.owner.fixer.registerClass(untransformed);
 
-        return null;
+        if (!this.owner.transformer.transformClass(MixinEnvironment.getCurrentEnvironment(), className, transformed)) {
+            return null;
+        }
+
+        this.owner.fixer.splitClass(untransformed, transformed);
+
+        return Util.writeNode(transformed);
     }
 
-    public static ClassLoadWatchTransformer register(Instrumentation instrumentation, Consumer<ClassNode> consumer) {
-        ClassLoadWatchTransformer transformer = new ClassLoadWatchTransformer(consumer);
+    public static PulpTransformer register(Instrumentation instrumentation, PulpMixinService owner) {
+        PulpTransformer transformer = new PulpTransformer(owner);
         instrumentation.addTransformer(transformer, false);
 
         Class<?>[] allLoadedClasses = instrumentation.getAllLoadedClasses();
@@ -50,7 +54,7 @@ public class ClassLoadWatchTransformer implements ClassFileTransformer {
                 }
                 ClassNode node = Util.readNode(reader);
 
-                consumer.accept(node);
+                owner.fixer.registerClass(node);
             } catch (ClassNotFoundException e) {
                 PulpPlugin.LOGGER.log(Level.WARNING, String.format("Missing expected class \"%s\"", clazz.getName()),
                         e);

@@ -27,6 +27,8 @@ dependencies {
     shadow 'net.bytebuddy:byte-buddy-agent:1.12.7'
     shadow 'org.ow2.asm:asm:9.2'
     shadow 'org.ow2.asm:asm-tree:9.2'
+    shadow 'org.ow2.asm:asm-util:9.2'
+    shadow 'org.ow2.asm:asm-commons:9.2'
     compileOnly 'org.spigotmc:spigot-api:1.18.1-R0.1-SNAPSHOT'
 }
 
