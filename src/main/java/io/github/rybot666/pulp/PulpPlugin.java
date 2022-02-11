@@ -1,5 +1,7 @@
 package io.github.rybot666.pulp;
 
+import io.github.rybot666.pulp.util.PulpLogger;
+import io.github.rybot666.pulp.util.UnsafeUtil;
 import io.github.rybot666.pulp.util.Util;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import org.bukkit.Bukkit;
@@ -10,14 +12,13 @@ import java.lang.instrument.Instrumentation;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.Collection;
 import java.util.jar.JarFile;
 import java.util.logging.Logger;
 
 public final class PulpPlugin extends JavaPlugin {
     public static final String NAME = "Pulp";
     public static final Instrumentation INSTRUMENTATION = ByteBuddyAgent.install();
-    public static final Logger LOGGER = Logger.getLogger(NAME);
+    public static final Logger LOGGER = new PulpLogger(PulpPlugin.class, NAME);
 
     private static boolean hasInitialised = false;
 
@@ -31,7 +32,6 @@ public final class PulpPlugin extends JavaPlugin {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static void addSelfToMinecraftClassPath() {
         try {
             URL pluginJarLocation = PulpPlugin.class.getProtectionDomain().getCodeSource().getLocation().toURI().toURL();
@@ -42,29 +42,11 @@ public final class PulpPlugin extends JavaPlugin {
                 return;
             }
 
-            // emulate URLClassLoader.addURL
-            Object ucp = Util.getFieldWithUnsafe(Bukkit.class.getClassLoader(), URLClassLoader.class, "ucp");
-            //noinspection SynchronizationOnLocalVariableOrMethodParameter
-            synchronized (ucp) {
-                if (Util.getBooleanWithUnsafe(ucp, ucp.getClass(), "closed")) {
-                    throw new AssertionError("UCP is closed");
-                }
-                Collection<URL> urls = (Collection<URL>) Util.getFieldWithUnsafe(ucp, ucp.getClass(), "unopenedUrls");
-                //noinspection SynchronizationOnLocalVariableOrMethodParameter
-                synchronized (urls) {
-                    Collection<URL> path = (Collection<URL>) Util.getFieldWithUnsafe(ucp, ucp.getClass(), "path");
-                    if (!path.contains(pluginJarLocation)) {
-                        urls.add(pluginJarLocation);
-                        path.add(pluginJarLocation);
-                    }
-                }
-            }
+            UnsafeUtil.addToURLClassPath((URLClassLoader) Bukkit.class.getClassLoader(), pluginJarLocation);
         } catch (IOException e) {
             throw new RuntimeException("Failed to load own jar file", e);
         } catch (URISyntaxException e) {
             throw new AssertionError("Something has gone horribly wrong", e);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Reflection error", e);
         }
     }
 

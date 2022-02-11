@@ -8,31 +8,11 @@ import org.objectweb.asm.tree.ClassNode;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.util.logging.Level;
 
 public class Util {
-    private static final sun.misc.Unsafe UNSAFE;
-    static {
-        try {
-            Field theUnsafe = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-            theUnsafe.setAccessible(true);
-            UNSAFE = (sun.misc.Unsafe) theUnsafe.get(null);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to get unsafe", e);
-        }
-    }
-
     private Util() {
         throw new UnsupportedOperationException("Cannot instantiate utility class");
-    }
-
-    public static Object getFieldWithUnsafe(Object instance, Class<?> ownerClass, String fieldName) throws NoSuchFieldException {
-        return UNSAFE.getObject(instance, UNSAFE.objectFieldOffset(ownerClass.getDeclaredField(fieldName)));
-    }
-
-    public static boolean getBooleanWithUnsafe(Object instance, Class<?> ownerClass, String fieldName) throws NoSuchFieldException {
-        return UNSAFE.getBoolean(instance, UNSAFE.objectFieldOffset(ownerClass.getDeclaredField(fieldName)));
     }
 
     public static ClassNode readNode(ClassReader reader) {
