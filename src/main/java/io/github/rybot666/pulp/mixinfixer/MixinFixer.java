@@ -100,4 +100,7 @@ public class MixinFixer {
             }
         }
     }
+
+    public void splitClass(ClassNode untransformed, ClassNode transformed) {
+    }
 }
