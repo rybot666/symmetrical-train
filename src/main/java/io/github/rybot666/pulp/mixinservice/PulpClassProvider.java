@@ -1,6 +1,7 @@
 package io.github.rybot666.pulp.mixinservice;
 
 import io.github.rybot666.pulp.util.Util;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.service.IClassBytecodeProvider;
 import org.spongepowered.asm.service.IClassProvider;
