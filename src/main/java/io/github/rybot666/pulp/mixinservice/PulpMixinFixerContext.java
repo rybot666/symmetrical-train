@@ -4,6 +4,7 @@ import io.github.rybot666.pulp.mixinfixer.IMixinFixerContext;
 import io.github.rybot666.pulp.util.Util;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.ClassNode;
 
 import java.io.IOException;
 
@@ -27,5 +28,10 @@ public class PulpMixinFixerContext implements IMixinFixerContext {
         } catch (ClassNotFoundException | IOException ignored) {}
 
         return false;
+    }
+
+    @Override
+    public void defineProxyClass(ClassNode proxyClass) {
+        // TODO
     }
 }

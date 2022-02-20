@@ -42,8 +42,9 @@ public class PulpTransformer implements ClassFileTransformer {
 
         Class<?>[] allLoadedClasses = instrumentation.getAllLoadedClasses();
         for (int i = 0; i < allLoadedClasses.length; i++) {
-            PulpPlugin.LOGGER.log(Level.FINEST, String.format("Processing loaded class %d/%d : %s", i + 1, allLoadedClasses.length, allLoadedClasses[i].getName()));
             Class<?> clazz = allLoadedClasses[i];
+            int indexToDisplay = i + 1;
+            PulpPlugin.LOGGER.log(Level.FINEST, () -> String.format("Processing loaded class %d/%d : %s", indexToDisplay, allLoadedClasses.length, clazz.getName()));
             if (clazz.isArray() || clazz.isPrimitive()) {
                 continue;
             }
