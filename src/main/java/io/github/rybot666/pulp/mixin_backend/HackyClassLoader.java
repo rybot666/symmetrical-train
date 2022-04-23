@@ -1,7 +1,8 @@
-package io.github.rybot666.pulp.mixinservice;
+package io.github.rybot666.pulp.mixin_backend;
 
 import org.bukkit.plugin.java.JavaPluginLoader;
 
+import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -12,10 +13,8 @@ import java.util.List;
 
 /**
  * Super cursed class loader that delegates to the classloader of every plugin in a plugin loader
- *
- * Placed here for repackaging hack on `PluginClassLoader` and its methods
  */
-public class PulpHackyClassLoader extends URLClassLoader {
+public class HackyClassLoader extends URLClassLoader {
     private static final VarHandle LOADERS_HANDLE;
     private static final Class<?> PLUGIN_CLASS_LOADER_CLASS;
     private static final MethodHandle LOAD_CLASS_0_HANDLE;
@@ -34,27 +33,44 @@ public class PulpHackyClassLoader extends URLClassLoader {
         }
     }
 
-    public PulpHackyClassLoader(ClassLoader parent, JavaPluginLoader loader) {
+    public HackyClassLoader(ClassLoader parent, JavaPluginLoader loader) {
         super(new URL[0], parent);
 
         this.loader = loader;
     }
 
+    @SuppressWarnings("unchecked")
+    private List<URLClassLoader> getLoaders() {
+        return (List<URLClassLoader>) LOADERS_HANDLE.get(this.loader);
+    }
+
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        @SuppressWarnings("unchecked")
-        List<Object> loaders = (List<Object>) LOADERS_HANDLE.get(this.loader);
-
-        for (Object loader : loaders) {
+        for (URLClassLoader loader: getLoaders()) {
             try {
                 return (Class<?>) LOAD_CLASS_0_HANDLE.invoke(loader, name, true, false, true);
-            } catch (ClassNotFoundException ignored) {
+            } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
 
-            } catch (Throwable t) {
-                throw new RuntimeException("Unexpected throwable", t);
+            } catch (Throwable th) {
+                throw new RuntimeException("Downstream plugin classloader threw exception in loadClass0", th);
             }
         }
 
         return super.findClass(name);
+    }
+
+    @Override
+    public InputStream getResourceAsStream(String name) {
+        for (URLClassLoader loader: getLoaders()) {
+            InputStream resource = loader.getResourceAsStream(name);
+
+            if (resource == null) {
+                continue;
+            }
+
+            return resource;
+        }
+
+        return super.getResourceAsStream(name);
     }
 }

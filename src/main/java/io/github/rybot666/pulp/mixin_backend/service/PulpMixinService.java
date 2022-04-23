@@ -1,8 +1,8 @@
-package io.github.rybot666.pulp.mixinservice;
+package io.github.rybot666.pulp.mixin_backend.service;
 
 import io.github.rybot666.pulp.PulpPlugin;
-import io.github.rybot666.pulp.mixinfixer.MixinFixer;
-import io.github.rybot666.pulp.util.LoggerAdapterPulp;
+import io.github.rybot666.pulp.mixin_backend.HackyClassLoader;
+import io.github.rybot666.pulp.mixin_backend.fixer.MixinFixer;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.SimplePluginManager;
@@ -23,27 +23,28 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 public class PulpMixinService extends MixinServiceAbstract {
-    public static final String NAME = PulpPlugin.NAME.concat("/").concat(Bukkit.getName());
+    public static final String NAME = PulpPlugin.NAME.concat(" on ").concat(Bukkit.getName());
     private static final String JAVA_PLUGIN_LOADER_PATTERN = "\\.jar$";
 
-    final PulpHackyClassLoader hackyClassLoader;
+    public final HackyClassLoader hackyClassLoader;
+
     final MixinFixer fixer;
     IMixinTransformer transformer;
     private final PulpClassProvider classProvider;
     private final IContainerHandle primaryContainer;
-    private final PulpTransformer pulpTransformer;
+    private PulpTransformer pulpTransformer;
 
     public PulpMixinService() {
-        this.hackyClassLoader = new PulpHackyClassLoader(this.getClass().getClassLoader(), getPluginLoader());
+        this.hackyClassLoader = new HackyClassLoader(this.getClass().getClassLoader(), getPluginLoader());
         this.classProvider = new PulpClassProvider(this);
-        this.fixer = new MixinFixer(new PulpMixinFixerContext(this));
+
+        this.fixer = new MixinFixer(this);
+
         try {
             this.primaryContainer = new ContainerHandleURI(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-
-        this.pulpTransformer = PulpTransformer.register(PulpPlugin.INSTRUMENTATION, this);
     }
 
     @SuppressWarnings("unchecked")
@@ -57,13 +58,19 @@ public class PulpMixinService extends MixinServiceAbstract {
 
             for (Map.Entry<Pattern, PluginLoader> entry : fileAssociations.entrySet()) {
                 if (entry.getKey().pattern().equals(JAVA_PLUGIN_LOADER_PATTERN)) {
-                    return (JavaPluginLoader) entry.getValue();
+                    PluginLoader loader = entry.getValue();
+
+                    if (!JavaPluginLoader.class.isAssignableFrom(loader.getClass())) {
+                        throw new AssertionError("JAR loader is not a JavaPluginLoader!");
+                    }
+
+                    return (JavaPluginLoader) loader;
                 }
             }
 
             throw new AssertionError("Couldn't find JavaPluginLoader in file associations");
         } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to reflect JavaPluginLoader", e);
+            throw new AssertionError("Failed to reflect for JavaPluginLoader", e);
         }
     }
 
@@ -119,13 +126,35 @@ public class PulpMixinService extends MixinServiceAbstract {
 
     @Override
     protected ILogger createLogger(String name) {
-        return new LoggerAdapterPulp("Mixin");
+        if ("mixin".equals(name)) {
+            return new LoggerAdapterPulp("Mixin");
+        }
+
+        return new LoggerAdapterPulp(String.format("Mixin/%s", name));
     }
 
     @Override
     public void offer(IMixinInternal internal) {
         if (internal instanceof IMixinTransformerFactory) {
             this.transformer = ((IMixinTransformerFactory) internal).createTransformer();
+            this.pulpTransformer = PulpTransformer.register(PulpPlugin.INSTRUMENTATION, this);
         }
+    }
+
+    @Override
+    public void prepare() {
+        this.fixer.interfaceCache.registerAllClasses(PulpPlugin.INSTRUMENTATION);
+
+        super.prepare();
+    }
+
+    @Override
+    public void init() {
+        super.init();
+    }
+
+    @Override
+    public void beginPhase() {
+        super.beginPhase();
     }
 }

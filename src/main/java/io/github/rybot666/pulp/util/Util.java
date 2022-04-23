@@ -1,18 +1,18 @@
 package io.github.rybot666.pulp.util;
 
 import com.google.common.io.Closeables;
-import io.github.rybot666.pulp.PulpPlugin;
+import io.github.rybot666.pulp.util.log.LogUtils;
+import io.github.rybot666.pulp.util.log.PulpLogger;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.transformers.MixinClassWriter;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.logging.Level;
 
 public class Util {
+    private static final PulpLogger LOGGER = LogUtils.getLogger();
+
     private Util() {
         throw new UnsupportedOperationException("Cannot instantiate utility class");
     }
@@ -32,10 +32,12 @@ public class Util {
         try {
             final String resourcePath = name.replace('.', '/').concat(".class");
             classStream = loader == null ? Object.class.getResourceAsStream("/" + resourcePath) : loader.getResourceAsStream(resourcePath);
+
             if (classStream == null) {
-                PulpPlugin.LOGGER.log(Level.FINEST, () -> String.format("No location found for class \"%s\"", name));
+                //LOGGER.warning(() -> String.format("Missing class bytecode for %s", name));
                 return null;
             }
+
             reader = new ClassReader(classStream);
         } finally {
             //noinspection UnstableApiUsage
@@ -52,12 +54,5 @@ public class Util {
         reader.accept(node, ClassReader.EXPAND_FRAMES);
 
         return node;
-    }
-
-    public static byte[] writeNode(ClassNode node) {
-        ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        node.accept(writer);
-
-        return writer.toByteArray();
     }
 }

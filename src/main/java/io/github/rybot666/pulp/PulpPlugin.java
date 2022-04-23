@@ -1,14 +1,16 @@
 package io.github.rybot666.pulp;
 
-import io.github.rybot666.pulp.util.PulpLogger;
+import io.github.rybot666.pulp.util.log.PulpLogger;
 import io.github.rybot666.pulp.util.UnsafeUtil;
-import io.github.rybot666.pulp.util.Util;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -21,16 +23,6 @@ public final class PulpPlugin extends JavaPlugin {
     public static final Logger LOGGER = new PulpLogger(PulpPlugin.class, NAME);
 
     private static boolean hasInitialised = false;
-
-    static {
-        addSelfToMinecraftClassPath();
-
-        try {
-            Class.forName("io.github.rybot666.pulp.MinecraftClassLoaded", true, Bukkit.class.getClassLoader());
-        } catch (ClassNotFoundException e) {
-            throw new AssertionError("Reflection error", e);
-        }
-    }
 
     private static void addSelfToMinecraftClassPath() {
         try {
@@ -53,10 +45,29 @@ public final class PulpPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         // using /reload will break everything
+        // TODO: reconsider this
         if (PulpPlugin.hasInitialised) {
             throw new UnsupportedOperationException("Cannot reload when mixins are in use - this command is deprecated");
         }
 
+        addSelfToMinecraftClassPath();
+
+        try {
+            Class<?> clazz = Class.forName("io.github.rybot666.pulp.PulpBootstrap", true, Bukkit.class.getClassLoader());
+            Method initMethod = clazz.getDeclaredMethod("init", Plugin.class);
+
+            initMethod.invoke(null, this);
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException("Error occurred during Pulp Bootstrap", e);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Reflection error while loading onto MC classpath", e);
+        }
+
         PulpPlugin.hasInitialised = true;
+    }
+
+    @Override
+    public void onDisable() {
+        super.onDisable();
     }
 }

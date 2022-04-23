@@ -1,4 +1,4 @@
-package io.github.rybot666.pulp.mixinservice;
+package io.github.rybot666.pulp.mixin_backend.service;
 
 import com.google.common.collect.Maps;
 import org.spongepowered.asm.service.IGlobalPropertyService;

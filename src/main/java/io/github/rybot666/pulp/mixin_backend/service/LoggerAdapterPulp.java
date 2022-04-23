@@ -1,10 +1,10 @@
-package io.github.rybot666.pulp.util;
+package io.github.rybot666.pulp.mixin_backend.service;
 
 import io.github.rybot666.pulp.PulpPlugin;
+import io.github.rybot666.pulp.util.log.PulpLogger;
 import org.spongepowered.asm.logging.Level;
 import org.spongepowered.asm.logging.LoggerAdapterAbstract;
 
-import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 /**

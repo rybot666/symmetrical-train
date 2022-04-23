@@ -1,6 +1,8 @@
 package io.github.rybot666.pulp.util;
 
+import io.github.rybot666.pulp.util.reflect.FieldUtils;
 import org.bukkit.Bukkit;
+import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.net.URL;
@@ -8,16 +10,7 @@ import java.net.URLClassLoader;
 import java.util.Collection;
 
 public class UnsafeUtil {
-    private static final sun.misc.Unsafe UNSAFE;
-    static {
-        try {
-            Field theUnsafe = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-            theUnsafe.setAccessible(true);
-            UNSAFE = (sun.misc.Unsafe) theUnsafe.get(null);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Failed to get unsafe", e);
-        }
-    }
+    private static final sun.misc.Unsafe UNSAFE = (Unsafe) FieldUtils.getStatic(Unsafe.class, "theUnsafe");
 
     private UnsafeUtil() {
         throw new UnsupportedOperationException("Cannot instantiate utility class");
@@ -40,7 +33,7 @@ public class UnsafeUtil {
     @SuppressWarnings({"unchecked", "SynchronizationOnLocalVariableOrMethodParameter"})
     public static void addToURLClassPath(URLClassLoader loader, URL url) {
         try {
-            Object ucp = getFieldWithUnsafe(Bukkit.class.getClassLoader(), URLClassLoader.class, "ucp");
+            Object ucp = getFieldWithUnsafe(loader, loader.getClass(), "ucp");
 
             synchronized (ucp) {
                 if (getBooleanWithUnsafe(ucp, ucp.getClass(), "closed")) {
