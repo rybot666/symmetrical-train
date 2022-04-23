@@ -111,7 +111,7 @@ public class PulpMixinService extends MixinServiceAbstract {
 
     @Override
     public Collection<String> getPlatformAgents() {
-        return Collections.emptyList();
+        return Collections.singleton("io.github.rybot666.pulp.mixin_backend.service.PulpServiceAgent");
     }
 
     @Override
