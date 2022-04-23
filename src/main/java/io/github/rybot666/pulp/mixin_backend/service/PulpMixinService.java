@@ -142,19 +142,9 @@ public class PulpMixinService extends MixinServiceAbstract {
     }
 
     @Override
-    public void prepare() {
+    public void init() {
         this.fixer.interfaceCache.registerAllClasses(PulpPlugin.INSTRUMENTATION);
 
-        super.prepare();
-    }
-
-    @Override
-    public void init() {
         super.init();
-    }
-
-    @Override
-    public void beginPhase() {
-        super.beginPhase();
     }
 }
