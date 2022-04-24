@@ -1,7 +1,7 @@
 package io.github.rybot666.pulp.discovery;
 
 import com.google.gson.Gson;
-import io.github.rybot666.pulp.PulpPlugin;
+import io.github.rybot666.pulp.PulpBootstrap;
 import io.github.rybot666.pulp.listener.BaseListener;
 import io.github.rybot666.pulp.util.log.LogUtils;
 import io.github.rybot666.pulp.util.log.PulpLogger;
@@ -10,7 +10,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.server.PluginDisableEvent;
-import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.SimplePluginManager;
@@ -32,9 +31,13 @@ public class PluginStateManager implements Listener {
     public static final String CONFIG_LOCATION = "pulp.config.json";
 
     static {
+        LOGGER.info("Starting mixin discovery on loaded plugins...");
+
         for (Plugin plugin : getAllLoadedPlugins()) {
             add(plugin);
         }
+
+        LOGGER.info("Mixin discovery complete");
     }
 
     private PluginStateManager() {
@@ -66,9 +69,9 @@ public class PluginStateManager implements Listener {
         File pluginFile = (File) FieldUtils.get(plugin, JavaPlugin.class, "file");
         PluginDescriptionFile descriptionFile = plugin.getDescription();
 
-        LOGGER.info(() -> String.format("Discovered %s, searching for mixin configs", descriptionFile.getName()));
+        LOGGER.fine(() -> String.format("Discovered %s, searching for mixin configs", descriptionFile.getName()));
 
-        if (!descriptionFile.getDepend().contains(PulpPlugin.NAME)) {
+        if (!descriptionFile.getDepend().contains(PulpBootstrap.NAME)) {
             // Plugins that don't depend on us are not trying to load mixins
             return;
         }
@@ -98,20 +101,6 @@ public class PluginStateManager implements Listener {
     }
 
     private static class StateListener extends BaseListener {
-        @EventHandler
-        private void onPluginEnabled(PluginEnableEvent event) {
-            Plugin plugin = event.getPlugin();
-
-            if (plugin.getName().equals(PulpPlugin.NAME)) return;
-
-            if (PLUGINS.contains(plugin)) {
-                LOGGER.warning(() -> String.format("%s has been enabled twice! This may cause problems", plugin.getName()));
-                return;
-            }
-
-            add(plugin);
-        }
-
         @EventHandler
         private void onPluginDisabled(PluginDisableEvent event) {
             Plugin plugin = event.getPlugin();

@@ -4,5 +4,3 @@ version: '${version}'
 main: io.github.rybot666.pulp.PulpPlugin
 api-version: 1.18
 load: STARTUP
-depend:
-  - Essentials

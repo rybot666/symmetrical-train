@@ -27,13 +27,15 @@ public class PulpServiceAgent implements IMixinPlatformServiceAgent {
     }
 
     @Override
-    @SuppressWarnings({"deprecation", "RedundantSuppression"}) // I don't know why IntelliJ doesn't like this
+    @Deprecated
     public void wire(MixinEnvironment.Phase phase, IConsumer<MixinEnvironment.Phase> phaseConsumer) {
-
+        if (phase == MixinEnvironment.Phase.PREINIT) {
+            phaseConsumer.accept(MixinEnvironment.Phase.DEFAULT);
+        }
     }
 
     @Override
-    @SuppressWarnings({"deprecation", "RedundantSuppression"})
+    @Deprecated
     public void unwire() {
 
     }

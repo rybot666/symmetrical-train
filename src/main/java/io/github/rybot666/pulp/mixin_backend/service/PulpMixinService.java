@@ -1,8 +1,9 @@
 package io.github.rybot666.pulp.mixin_backend.service;
 
-import io.github.rybot666.pulp.PulpPlugin;
+import io.github.rybot666.pulp.PulpBootstrap;
 import io.github.rybot666.pulp.mixin_backend.HackyClassLoader;
-import io.github.rybot666.pulp.mixin_backend.fixer.MixinFixer;
+import io.github.rybot666.pulp.mixin_backend.transformer.fixer.MixinFixer;
+import io.github.rybot666.pulp.mixin_backend.transformer.PulpTransformer;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.SimplePluginManager;
@@ -23,16 +24,15 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 public class PulpMixinService extends MixinServiceAbstract {
-    public static final String NAME = PulpPlugin.NAME.concat(" on ").concat(Bukkit.getName());
+    public static final String NAME = PulpBootstrap.NAME.concat(" on ").concat(Bukkit.getName());
     private static final String JAVA_PLUGIN_LOADER_PATTERN = "\\.jar$";
 
     public final HackyClassLoader hackyClassLoader;
-
-    final MixinFixer fixer;
-    IMixinTransformer transformer;
+    public final MixinFixer fixer;
+    public IMixinTransformer transformer;
     private final PulpClassProvider classProvider;
     private final IContainerHandle primaryContainer;
-    private PulpTransformer pulpTransformer;
+    public PulpTransformer pulpTransformer;
 
     public PulpMixinService() {
         this.hackyClassLoader = new HackyClassLoader(this.getClass().getClassLoader(), getPluginLoader());
@@ -116,7 +116,7 @@ public class PulpMixinService extends MixinServiceAbstract {
 
     @Override
     public IContainerHandle getPrimaryContainer() {
-        return primaryContainer;
+        return this.primaryContainer;
     }
 
     @Override
@@ -137,13 +137,13 @@ public class PulpMixinService extends MixinServiceAbstract {
     public void offer(IMixinInternal internal) {
         if (internal instanceof IMixinTransformerFactory) {
             this.transformer = ((IMixinTransformerFactory) internal).createTransformer();
-            this.pulpTransformer = PulpTransformer.register(PulpPlugin.INSTRUMENTATION, this);
+            this.pulpTransformer = PulpTransformer.register(PulpBootstrap.INSTRUMENTATION, this);
         }
     }
 
     @Override
     public void init() {
-        this.fixer.interfaceCache.registerAllClasses(PulpPlugin.INSTRUMENTATION);
+        this.fixer.interfaceCache.registerAllClasses(PulpBootstrap.INSTRUMENTATION);
 
         super.init();
     }

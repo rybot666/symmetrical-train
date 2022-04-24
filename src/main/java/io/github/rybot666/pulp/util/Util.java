@@ -9,6 +9,8 @@ import org.objectweb.asm.tree.ClassNode;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 public class Util {
     private static final PulpLogger LOGGER = LogUtils.getLogger();
@@ -54,5 +56,10 @@ public class Util {
         reader.accept(node, ClassReader.EXPAND_FRAMES);
 
         return node;
+    }
+
+    public static <T> T make(T obj, Consumer<T> initializer) {
+        initializer.accept(obj);
+        return obj;
     }
 }

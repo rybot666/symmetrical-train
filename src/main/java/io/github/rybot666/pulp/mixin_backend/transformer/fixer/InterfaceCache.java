@@ -1,9 +1,9 @@
-package io.github.rybot666.pulp.mixin_backend.fixer;
+package io.github.rybot666.pulp.mixin_backend.transformer.fixer;
 
 import io.github.rybot666.pulp.mixin_backend.service.PulpMixinService;
+import io.github.rybot666.pulp.util.Util;
 import io.github.rybot666.pulp.util.log.LogUtils;
 import io.github.rybot666.pulp.util.log.PulpLogger;
-import io.github.rybot666.pulp.util.Util;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -22,6 +22,7 @@ public class InterfaceCache {
     private final Map<String, Set<String>> classesImplementingInterface = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> classesUsingInterface = new ConcurrentHashMap<>();
     private final Map<String, Boolean> isInterfaceCache = new ConcurrentHashMap<>();
+    private final Set<String> processedClasses = ConcurrentHashMap.newKeySet();
     private final PulpMixinService service;
 
     public InterfaceCache(PulpMixinService service) {
@@ -76,6 +77,8 @@ public class InterfaceCache {
             return;
         }
 
+        if (this.processedClasses.contains(node.name)) return;
+
         if (node.interfaces != null) {
             for (String itf: node.interfaces) {
                 this.classesImplementingInterface.computeIfAbsent(itf, k -> ConcurrentHashMap.newKeySet()).add(node.name);
@@ -116,6 +119,8 @@ public class InterfaceCache {
                 });
             }
         }
+
+        this.processedClasses.add(node.name);
     }
 
     public void registerAllClasses(Instrumentation instrumentation) {
@@ -160,5 +165,13 @@ public class InterfaceCache {
         int finalInvalidCount = invalidCount;
         LOGGER.info(() -> String.format("Searched %d classes (%d missing bytecode) in %dms - found %d implementations and %d usages",
                 allLoaded.length - finalInvalidCount, finalInvalidCount, diff, this.classesImplementingInterface.size(), this.classesUsingInterface.size()));
+    }
+
+    public Set<String> getClassesUsing(String interfaceName) {
+        return this.classesUsingInterface.computeIfAbsent(interfaceName, k -> ConcurrentHashMap.newKeySet());
+    }
+
+    public Set<String> getClassesImplementing(String interfaceName) {
+        return this.classesImplementingInterface.computeIfAbsent(interfaceName, k -> ConcurrentHashMap.newKeySet());
     }
 }
