@@ -6,9 +6,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -22,7 +24,7 @@ public final class PulpPlugin extends JavaPlugin {
 
     private static void addSelfToMinecraftClassPath() {
         try {
-            URL pluginJarLocation = PulpPlugin.class.getProtectionDomain().getCodeSource().getLocation().toURI().toURL();
+            URL pluginJarLocation = PulpPlugin.class.getProtectionDomain().getCodeSource().getLocation();
 
             if (!(Bukkit.class.getClassLoader() instanceof URLClassLoader)) {
                 // we're in Java 9+ without the server bundler existing, we're on the system class loader
@@ -33,8 +35,6 @@ public final class PulpPlugin extends JavaPlugin {
             UnsafeUtil.addToURLClassPath((URLClassLoader) Bukkit.class.getClassLoader(), pluginJarLocation);
         } catch (IOException e) {
             throw new RuntimeException("Failed to load own jar file", e);
-        } catch (URISyntaxException e) {
-            throw new AssertionError("Something has gone horribly wrong", e);
         }
     }
 

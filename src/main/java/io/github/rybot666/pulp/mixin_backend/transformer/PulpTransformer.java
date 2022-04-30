@@ -2,7 +2,10 @@ package io.github.rybot666.pulp.mixin_backend.transformer;
 
 import io.github.rybot666.pulp.PulpBootstrap;
 import io.github.rybot666.pulp.mixin_backend.service.PulpMixinService;
-import io.github.rybot666.pulp.mixin_backend.transformer.fixer.ClassDiff;
+import io.github.rybot666.pulp.mixin_backend.transformer.transformations.MethodAdded;
+import io.github.rybot666.pulp.mixin_backend.transformer.transformations.Transformation;
+import io.github.rybot666.pulp.mixin_backend.transformer.transformations.TransformationState;
+import io.github.rybot666.pulp.util.Util;
 import io.github.rybot666.pulp.util.log.LogUtils;
 import io.github.rybot666.pulp.util.log.PulpLogger;
 import org.objectweb.asm.ClassReader;
@@ -21,8 +24,23 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
+// TODO: implement transformers for mixin operations that Instrumentation cannot directly do
+// - Some injects generate handler methods which are then called
+//   > Add these to proxy method, retransform usages in class (no global search required)
+//   > (opt) This can be inlined which reduces the requirement for proxy classes in some cases
+// - `@Mutable` definalises fields
+//   > Generate a proxy class with a definalised field (same name etc)
+//   > Replace all uses globally with this proxy field
+//   > (opt) Private fields only need to be changed in the target
+//   > (feat) Somehow let reflection work on these?
+// - Interfaces added (via `@Interface` or `implements` on the mixin)
+//   > Add the interface to the proxy class
+//   > Transform all usages of the class in interface position to use the proxy class
+// - (feat) Access wideners? (this is hard, not part of mixin, would be nice to have tho)
+
 public class PulpTransformer implements ClassFileTransformer {
     private static final PulpLogger LOGGER = LogUtils.getLogger("Transformer");
+    private static final List<Transformation> TRANSFORMATIONS = Util.make(new ArrayList<>(), (l) -> l.add(new MethodAdded()));
     private final PulpMixinService owner;
 
     public PulpTransformer(PulpMixinService owner) {
@@ -33,6 +51,7 @@ public class PulpTransformer implements ClassFileTransformer {
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
         LOGGER.finest(() -> String.format("Class transformation requested for %s", className));
 
+        // Parse a classnode from the passed bytes
         ClassReader reader = new ClassReader(classfileBuffer);
         ClassNode untransformed = new ClassNode();
 
@@ -41,16 +60,19 @@ public class PulpTransformer implements ClassFileTransformer {
         ClassNode transformed = new ClassNode();
         untransformed.accept(transformed);
 
-        this.owner.fixer.interfaceCache.processClass(untransformed);
+        this.owner.fixer.interfaceCache.applyOptional((c) -> c.processClass(untransformed));
 
         if (!this.owner.transformer.transformClass(MixinEnvironment.getCurrentEnvironment(), className.replace('/', '.'), transformed)) {
             return null;
         }
 
-        ClassDiff diff = new ClassDiff(untransformed, transformed);
+        // Generate and apply class diff
+        TransformationState state = new TransformationState(untransformed, transformed);
+        TRANSFORMATIONS.forEach((t) -> t.apply(state));
 
+        // Write back class bytes and return them
         ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        transformed.accept(writer);
+        state.transformed.accept(writer);
 
         return writer.toByteArray();
     }
@@ -87,8 +109,6 @@ public class PulpTransformer implements ClassFileTransformer {
 
         // First pass, locate all classes that need a retransform
         Set<Class<?>> retransformTargets = new HashSet<>();
-        List<IMixinConfig> configs = this.getMixinConfigs();
-        configs.get(0).getTargets();
 
         Set<String> allTargets = this.getMixinConfigs().stream()
                 .map(IMixinConfig::getTargets)
@@ -105,20 +125,18 @@ public class PulpTransformer implements ClassFileTransformer {
         // Attempt retransformation of all mixin targets
         LOGGER.info(() -> String.format("Found %d mixin target classes to retransform", retransformTargets.size()));
 
-
         for (Class<?> clazz: retransformTargets) {
             try {
                 PulpBootstrap.INSTRUMENTATION.retransformClasses(clazz);
             } catch (UnmodifiableClassException e) {
-                LOGGER.warning(() -> String.format("Retransformation failure! %s is an unmodifiable class", clazz.getName()));
+                LOGGER.severe(() -> String.format("Retransformation failure! %s is an unmodifiable class", clazz.getName()));
             } catch (UnsupportedOperationException e) {
                 LOGGER.severe("********************");
-                LOGGER.severe("Unsupported operation occurred during a mixin class retransformation!");
-                LOGGER.severe("This means that Pulp has missed an illegal class transformation - this is a bug. Please report it so we can fix it");
+                LOGGER.severe("Unsupported operation occurred during mixin application!");
+                LOGGER.severe("This means that Pulp has missed an illegal class retransformation - this is a bug. Please report it!");
                 LOGGER.severe("");
                 LOGGER.severe(() -> String.format("Target class: %s. Reason: %s (full trace below)", clazz.getName(), e));
-                LOGGER.severe("********************");
-                LOGGER.log(Level.SEVERE, "", e);
+                LOGGER.log(Level.SEVERE, "********************", e);
             }
         }
 

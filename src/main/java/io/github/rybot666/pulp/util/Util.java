@@ -10,7 +10,6 @@ import org.objectweb.asm.tree.ClassNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
 public class Util {
     private static final PulpLogger LOGGER = LogUtils.getLogger();

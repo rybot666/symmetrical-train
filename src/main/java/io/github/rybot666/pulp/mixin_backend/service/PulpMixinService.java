@@ -2,7 +2,7 @@ package io.github.rybot666.pulp.mixin_backend.service;
 
 import io.github.rybot666.pulp.PulpBootstrap;
 import io.github.rybot666.pulp.mixin_backend.HackyClassLoader;
-import io.github.rybot666.pulp.mixin_backend.transformer.fixer.MixinFixer;
+import io.github.rybot666.pulp.mixin_backend.transformer.MixinFixer;
 import io.github.rybot666.pulp.mixin_backend.transformer.PulpTransformer;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginLoader;
@@ -11,6 +11,7 @@ import org.bukkit.plugin.java.JavaPluginLoader;
 import org.spongepowered.asm.launch.platform.container.ContainerHandleURI;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory;
 import org.spongepowered.asm.service.*;
@@ -142,9 +143,12 @@ public class PulpMixinService extends MixinServiceAbstract {
     }
 
     @Override
-    public void init() {
-        this.fixer.interfaceCache.registerAllClasses(PulpBootstrap.INSTRUMENTATION);
+    public MixinEnvironment.CompatibilityLevel getMinCompatibilityLevel() {
+        return MixinEnvironment.CompatibilityLevel.JAVA_7;
+    }
 
-        super.init();
+    @Override
+    public MixinEnvironment.CompatibilityLevel getMaxCompatibilityLevel() {
+        return MixinEnvironment.CompatibilityLevel.JAVA_17;
     }
 }

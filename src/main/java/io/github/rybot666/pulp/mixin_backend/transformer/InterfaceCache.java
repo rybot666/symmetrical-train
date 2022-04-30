@@ -1,4 +1,4 @@
-package io.github.rybot666.pulp.mixin_backend.transformer.fixer;
+package io.github.rybot666.pulp.mixin_backend.transformer;
 
 import io.github.rybot666.pulp.mixin_backend.service.PulpMixinService;
 import io.github.rybot666.pulp.util.Util;

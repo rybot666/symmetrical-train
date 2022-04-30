@@ -105,6 +105,10 @@ public class PluginStateManager implements Listener {
         private void onPluginDisabled(PluginDisableEvent event) {
             Plugin plugin = event.getPlugin();
 
+            if (plugin.getName().equals(PulpBootstrap.NAME)) {
+                return;
+            }
+
             if (PLUGINS.contains(plugin)) {
                 LOGGER.warning(() -> String.format("%s has been disabled! This may cause problems", plugin.getName()));
             }

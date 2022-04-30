@@ -1,11 +1,4 @@
-package io.github.rybot666.pulp.mixin_backend.transformer.fixer;
-
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
-import org.objectweb.asm.tree.MethodNode;
-
-import java.util.ArrayList;
-import java.util.List;
+package io.github.rybot666.pulp.mixin_backend.transformer.transformations;
 
 /**
  * The main operation Pulp needs to perform
@@ -23,27 +16,17 @@ import java.util.List;
  * harder still. However, all the above are possible by generating a secondary proxy class, and in some cases
  * modifying usages of the target class, which is what Pulp aims to provide.
  */
-public class ClassDiff {
-    private final ObjectDiff<MethodNode> methods;
-    private final ObjectDiff<FieldNode> fields;
-    private final ObjectDiff<String> interfaces;
-
-    public ClassDiff(ClassNode original, ClassNode transformed) {
-        this.methods = new ObjectDiff<>(original.methods, transformed.methods);
-        this.fields = new ObjectDiff<>(original.fields, transformed.fields);
-        this.interfaces = new ObjectDiff<>(original.interfaces, transformed.interfaces);
+public abstract class Transformation {
+    /**
+     * Applies the transformation to the base and proxy classes
+     *
+     * @param state the state from the transformer
+     * @return whether the transformation modified any classes
+     */
+    public boolean apply(TransformationState state) {
+        return false;
     }
 
-    public static class ObjectDiff<T> {
-        public final List<T> added;
-        public final List<T> removed;
+    // TODO handle class transformation of classes outside of the proxy and base classes
 
-        public ObjectDiff(List<T> original, List<T> modified) {
-            this.added = new ArrayList<>(modified);
-            this.added.removeAll(original);
-
-            this.removed = new ArrayList<>(original);
-            this.removed.removeAll(modified);
-        }
-    }
 }
