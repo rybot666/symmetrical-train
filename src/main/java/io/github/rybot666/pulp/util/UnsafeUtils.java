@@ -9,10 +9,10 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Collection;
 
-public class UnsafeUtil {
+public class UnsafeUtils {
     private static final sun.misc.Unsafe UNSAFE = (Unsafe) FieldUtils.getStatic(Unsafe.class, "theUnsafe");
 
-    private UnsafeUtil() {
+    private UnsafeUtils() {
         throw new UnsupportedOperationException("Cannot instantiate utility class");
     }
 

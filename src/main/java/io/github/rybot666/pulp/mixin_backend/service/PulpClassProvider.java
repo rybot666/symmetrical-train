@@ -1,6 +1,6 @@
 package io.github.rybot666.pulp.mixin_backend.service;
 
-import io.github.rybot666.pulp.util.Util;
+import io.github.rybot666.pulp.util.Utils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.service.IClassBytecodeProvider;
@@ -39,13 +39,13 @@ public class PulpClassProvider implements IClassProvider, IClassBytecodeProvider
 
     @Override
     public ClassNode getClassNode(String name) throws ClassNotFoundException, IOException {
-        ClassReader classReader = Util.getClassReader(this.service.hackyClassLoader, name);
+        ClassReader classReader = Utils.getClassReader(this.service.hackyClassLoader, name);
 
         if (classReader == null) {
             throw new ClassNotFoundException(name);
         }
 
-        return Util.readNode(classReader);
+        return Utils.readNode(classReader);
     }
 
     @Override

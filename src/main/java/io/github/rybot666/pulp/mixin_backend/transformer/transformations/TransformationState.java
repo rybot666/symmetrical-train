@@ -1,6 +1,7 @@
 package io.github.rybot666.pulp.mixin_backend.transformer.transformations;
 
 import io.github.rybot666.pulp.mixin_backend.transformer.proxy.ProxyFactory;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -29,6 +30,6 @@ public class TransformationState {
         this.addedInterfaces = new ArrayList<>(transformed.interfaces);
         this.addedInterfaces.removeAll(original.interfaces);
 
-        this.proxy = ProxyFactory.generateBaseProxy(this.transformed);
+        this.proxy = ProxyFactory.generateBaseProxy(Type.getObjectType(transformed.name));
     }
 }

@@ -11,10 +11,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.function.Consumer;
 
-public class Util {
+public class Utils {
     private static final PulpLogger LOGGER = LogUtils.getLogger();
 
-    private Util() {
+    private Utils() {
         throw new UnsupportedOperationException("Cannot instantiate utility class");
     }
 

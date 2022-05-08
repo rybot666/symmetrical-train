@@ -1,7 +1,7 @@
 package io.github.rybot666.pulp.mixin_backend.transformer;
 
 import io.github.rybot666.pulp.mixin_backend.service.PulpMixinService;
-import io.github.rybot666.pulp.util.Util;
+import io.github.rybot666.pulp.util.Utils;
 import io.github.rybot666.pulp.util.log.LogUtils;
 import io.github.rybot666.pulp.util.log.PulpLogger;
 import org.objectweb.asm.*;
@@ -38,7 +38,7 @@ public class InterfaceCache {
         boolean isInterface = false;
 
         try {
-            ClassReader reader = Util.getClassReader(this.service.hackyClassLoader, internalName);
+            ClassReader reader = Utils.getClassReader(this.service.hackyClassLoader, internalName);
             isInterface = reader != null && (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0;
         } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
 
@@ -141,7 +141,7 @@ public class InterfaceCache {
                     clazz = clazz.getComponentType();
                 }
 
-                ClassReader reader = Util.getClassReader(this.service.hackyClassLoader, clazz.getName());
+                ClassReader reader = Utils.getClassReader(this.service.hackyClassLoader, clazz.getName());
 
                 if (reader == null) {
                     invalidCount++;

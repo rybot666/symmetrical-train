@@ -1,6 +1,6 @@
 package io.github.rybot666.pulp.mixin_backend.transformer.proxy;
 
-import io.github.rybot666.pulp.util.Util;
+import io.github.rybot666.pulp.util.Utils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -11,25 +11,44 @@ public class ProxyFactory {
     // Map of internal target name to proxy classes
     public static final WeakHashMap<String, Class<? extends ProxyMarker>> PROXY_CLASS_MAP = new WeakHashMap<>();
 
-    public static ClassNode generateBaseProxy(ClassNode target) {
+    public static ClassNode generateBaseProxy(Type target) {
         ClassNode proxy = new ClassNode();
-        proxy.name = getProxyClassName(target.name);
+        proxy.name = getProxyClassName(target.getInternalName());
         proxy.access = Opcodes.ACC_SYNTHETIC | Opcodes.ACC_PUBLIC;
         proxy.superName = "java/lang/Object";
+        proxy.version = 60;
 
         // Add static instances field (map of target instance to their proxy instance)
         Type weakHashType = Type.getType(WeakHashMap.class);
 
         proxy.fields.add(new FieldNode(
-                Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+                Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
                 "INSTANCES",
                 weakHashType.getDescriptor(),
                 null,
                 null
         ));
 
+        // Debug field
+        proxy.fields.add(new FieldNode(
+                Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                "PROXYING_FOR",
+                Type.getDescriptor(String.class),
+                null,
+                target.getInternalName()
+        ));
+
+        // Instance field
+        proxy.fields.add(new FieldNode(
+                Opcodes.ACC_SYNTHETIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+                "this$",
+                target.getDescriptor(),
+                null,
+                null
+        ));
+
         // Static initializer
-        proxy.methods.add(Util.make(new MethodNode(), m -> {
+        proxy.methods.add(Utils.make(new MethodNode(), m -> {
             m.name = "<clinit>";
             m.desc = "()V";
             m.access = Opcodes.ACC_STATIC;
@@ -45,22 +64,46 @@ public class ProxyFactory {
             m.instructions.add(new InsnNode(Opcodes.RETURN));
         }));
 
+        // General constructor
+        proxy.methods.add(Utils.make(new MethodNode(), m -> {
+            m.name = "<init>";
+            m.desc = Type.getMethodDescriptor(Type.VOID_TYPE, target);
+            m.access = Opcodes.ACC_PUBLIC;
+
+            m.instructions = new InsnList();
+
+            // Object super call
+            m.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+            m.instructions.add(new MethodInsnNode(
+                    Opcodes.INVOKESPECIAL,
+                    Type.getInternalName(Object.class),
+                    "<init>",
+                    "()V"
+            ));
+
+            // Set instance field
+            m.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+            m.instructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+
+            m.instructions.add(new FieldInsnNode(
+                    Opcodes.PUTFIELD,
+                    proxy.name,
+                    "this$",
+                    target.getDescriptor()
+            ));
+
+            m.instructions.add(new InsnNode(Opcodes.RETURN));
+        }));
+
         // Apply proxy marker interface
-        proxy.interfaces.add(Type.getDescriptor(ProxyMarker.class));
+        proxy.interfaces.add(Type.getInternalName(ProxyMarker.class));
 
         return proxy;
     }
 
     public static String getProxyClassName(String name) {
-        String packageName = "";
-        String className = name;
+        String packageName = name.replace("/", "$$");
 
-        int idx = name.lastIndexOf('/');
-        if (idx != -1) {
-            className = name.substring(idx + 1);
-            packageName = name.substring(0, idx);
-        }
-
-        return packageName.concat("/").concat("$$PulpProxy$").concat(className);
+        return "io/github/rybot666/pulp/proxies/".concat(packageName);
     }
 }

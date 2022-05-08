@@ -30,9 +30,10 @@ public class PulpMixinService extends MixinServiceAbstract {
 
     public final HackyClassLoader hackyClassLoader;
     public final MixinFixer fixer;
-    public IMixinTransformer transformer;
     private final PulpClassProvider classProvider;
     private final IContainerHandle primaryContainer;
+
+    public IMixinTransformer transformer;
     public PulpTransformer pulpTransformer;
 
     public PulpMixinService() {

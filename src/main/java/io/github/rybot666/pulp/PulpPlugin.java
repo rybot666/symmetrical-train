@@ -1,20 +1,18 @@
 package io.github.rybot666.pulp;
 
 import io.github.rybot666.pulp.util.log.PulpLogger;
-import io.github.rybot666.pulp.util.UnsafeUtil;
+import io.github.rybot666.pulp.util.UnsafeUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.jar.JarFile;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class PulpPlugin extends JavaPlugin {
@@ -32,7 +30,7 @@ public final class PulpPlugin extends JavaPlugin {
                 return;
             }
 
-            UnsafeUtil.addToURLClassPath((URLClassLoader) Bukkit.class.getClassLoader(), pluginJarLocation);
+            UnsafeUtils.addToURLClassPath((URLClassLoader) Bukkit.class.getClassLoader(), pluginJarLocation);
         } catch (IOException e) {
             throw new RuntimeException("Failed to load own jar file", e);
         }
@@ -54,7 +52,8 @@ public final class PulpPlugin extends JavaPlugin {
 
             initMethod.invoke(null, this);
         } catch (InvocationTargetException e) {
-            throw new RuntimeException("Error occurred during Pulp Bootstrap", e);
+            LOGGER.log(Level.SEVERE, "Error occurred during bootstrap! Stopping...", e);
+            System.exit(1);
         } catch (ReflectiveOperationException e) {
             throw new AssertionError("Reflection error while loading onto MC classpath", e);
         }
