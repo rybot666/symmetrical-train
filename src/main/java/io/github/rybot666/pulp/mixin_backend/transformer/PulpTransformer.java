@@ -2,15 +2,15 @@ package io.github.rybot666.pulp.mixin_backend.transformer;
 
 import io.github.rybot666.pulp.PulpBootstrap;
 import io.github.rybot666.pulp.mixin_backend.service.PulpMixinService;
-import io.github.rybot666.pulp.mixin_backend.transformer.proxy.ProxyFactory;
 import io.github.rybot666.pulp.mixin_backend.transformer.proxy.ProxyMarker;
 import io.github.rybot666.pulp.mixin_backend.transformer.transformations.MethodAdded;
 import io.github.rybot666.pulp.mixin_backend.transformer.transformations.Transformation;
 import io.github.rybot666.pulp.mixin_backend.transformer.transformations.TransformationState;
-import io.github.rybot666.pulp.proxies.ProxyClassPackage;
+import io.github.rybot666.pulp.proxies.GlobalProxyState;
 import io.github.rybot666.pulp.util.Utils;
 import io.github.rybot666.pulp.util.log.LogUtils;
 import io.github.rybot666.pulp.util.log.PulpLogger;
+import org.bukkit.Bukkit;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
@@ -112,7 +112,6 @@ public class PulpTransformer implements ClassFileTransformer {
                         Path proxyClassPath = Paths.get(".pulp.out", "bytecode", "proxy", transformed.name.concat(".class"));
                         Path proxyTracePath = Paths.get(".pulp.out", "trace", "proxy", transformed.name.concat(".trace.txt"));
 
-
                         dumpClass(proxyClassPath, state.proxy);
                         checkAndDumpTrace(proxyTracePath, state.proxy);
                     } catch (IOException e) {
@@ -121,11 +120,14 @@ public class PulpTransformer implements ClassFileTransformer {
                 }
 
                 @SuppressWarnings("unchecked")
-                Class<? extends ProxyMarker> proxyClazz = (Class<? extends ProxyMarker>) ProxyClassPackage.LOOKUP.defineClass(proxyBytes);
+                Class<? extends ProxyMarker> proxyClazz = (Class<? extends ProxyMarker>) GlobalProxyState.LOOKUP.defineClass(proxyBytes);
 
-                ProxyFactory.PROXY_CLASS_MAP.put(state.transformed.name, proxyClazz);
+                synchronized (GlobalProxyState.PROXY_CLASS_MAP) {
+                    GlobalProxyState.PROXY_CLASS_MAP.put(state.transformed.name, proxyClazz);
+                }
             } catch (Throwable e) {
                 LOGGER.log(Level.SEVERE, e, () -> String.format("Error while defining proxy class for %s", state.transformed.name));
+                Bukkit.shutdown();
             }
 
             // Write back class bytes and return them
@@ -153,8 +155,8 @@ public class PulpTransformer implements ClassFileTransformer {
             }
 
             return bytes;
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, e, () -> String.format("An error occurred during class transformation on %s", className));
+        } catch (Throwable th) {
+            LOGGER.log(Level.SEVERE, th, () -> String.format("An error occurred during class transformation on %s", className));
             return null;
         }
     }

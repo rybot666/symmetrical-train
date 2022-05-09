@@ -8,9 +8,6 @@ import org.objectweb.asm.tree.*;
 import java.util.WeakHashMap;
 
 public class ProxyFactory {
-    // Map of internal target name to proxy classes
-    public static final WeakHashMap<String, Class<? extends ProxyMarker>> PROXY_CLASS_MAP = new WeakHashMap<>();
-
     public static ClassNode generateBaseProxy(Type target) {
         ClassNode proxy = new ClassNode();
         proxy.name = getProxyClassName(target.getInternalName());
@@ -105,5 +102,9 @@ public class ProxyFactory {
         String packageName = name.replace("/", "$$");
 
         return "io/github/rybot666/pulp/proxies/".concat(packageName);
+    }
+
+    private ProxyFactory() {
+        throw new UnsupportedOperationException("Cannot instantiate utility class");
     }
 }

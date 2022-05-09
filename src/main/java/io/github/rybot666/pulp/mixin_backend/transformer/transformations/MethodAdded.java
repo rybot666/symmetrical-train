@@ -1,10 +1,9 @@
 package io.github.rybot666.pulp.mixin_backend.transformer.transformations;
 
-import io.github.rybot666.pulp.mixin_backend.transformer.proxy.PulpBootstrapMethods;
+import io.github.rybot666.pulp.mixin_backend.transformer.proxy.IndyFactory;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
-import org.spongepowered.asm.util.asm.ASM;
 
 import java.util.*;
 
@@ -37,7 +36,7 @@ public class MethodAdded extends Transformation {
         node.instructions.add(new VarInsnNode(originalClass.getOpcode(Opcodes.ILOAD), 0));
         slot += originalClass.getSize();
 
-        node.instructions.add(PulpBootstrapMethods.generateGetProxyNode(originalClass));
+        node.instructions.add(IndyFactory.getProxyIndy(originalClass));
 
         // Load arguments from LVT on to stack
         // Skip the first one because it's the target instance
@@ -61,6 +60,15 @@ public class MethodAdded extends Transformation {
         return node;
     }
 
+    private static void transformAddedMethod(MethodNode addedMethod) {
+        // 1. Usages of non-public fields
+        //
+        // This is an issue because Mixin assumes that the injected method is inside the target class. Normally this is
+        // true, so all fields are accessible to the injected method. However, we moved the method to a proxy class, so
+        // those fields must be accessed reflectively (we use indy)
+
+    }
+
     @Override
     public boolean apply(TransformationState state) {
         // Transform methods in the original class to refer to the new class
@@ -70,7 +78,8 @@ public class MethodAdded extends Transformation {
             // Remove all added methods from the original class
             state.transformed.methods.remove(addedMethod);
 
-            // Move them to the proxy class
+            // Transform them as needed and move them to the proxy class
+            transformAddedMethod(addedMethod);
             state.proxy.methods.add(addedMethod);
 
             // Store method in map for transformation step

@@ -16,7 +16,7 @@ public class PulpBootstrap {
     
     public static final String NAME = "Pulp";
     public static final Instrumentation INSTRUMENTATION;
-    public static boolean DEBUG = System.getProperty("pulp.debug", "false").equals("true");
+    public static boolean DEBUG = Boolean.getBoolean("pulp.debug");
 
     static {
         try {
