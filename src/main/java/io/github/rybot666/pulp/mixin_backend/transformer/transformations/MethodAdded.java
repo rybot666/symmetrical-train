@@ -53,20 +53,89 @@ public class MethodAdded extends Transformation {
         node.instructions.add(targetMethodCall);
 
         // Proxy return
-        int opcode = desc.getReturnType().getOpcode(Opcodes.IRETURN);
-        InsnNode insn = new InsnNode(opcode);
-        node.instructions.add(insn);
+        node.instructions.add(new InsnNode(desc.getReturnType().getOpcode(Opcodes.IRETURN)));
 
         return node;
     }
 
-    private static void transformAddedMethod(MethodNode addedMethod) {
+    private static void transformAddedMethod(ClassNode targetClass, Type proxyClass, MethodNode addedMethod) {
         // 1. Usages of non-public fields
         //
         // This is an issue because Mixin assumes that the injected method is inside the target class. Normally this is
         // true, so all fields are accessible to the injected method. However, we moved the method to a proxy class, so
         // those fields must be accessed reflectively (we use indy)
 
+        for (AbstractInsnNode insn: addedMethod.instructions) {
+            if (insn instanceof FieldInsnNode) {
+                FieldInsnNode fieldInsnNode = (FieldInsnNode) insn;
+
+                if (!fieldInsnNode.owner.equals(targetClass.name)) {
+                    continue;
+                }
+
+                // Locate field in target
+                FieldNode targetField = targetClass.fields.stream()
+                        .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Field instruction trying to access nonexistent field"));
+
+                // Skip public fields (perf)
+                if ((targetField.access & Opcodes.ACC_PUBLIC) != 0) continue;
+
+                Type ownerType = Type.getObjectType(fieldInsnNode.owner);
+                Type fieldType = Type.getType(fieldInsnNode.desc);
+
+                InsnList insnList = new InsnList();
+
+                switch (fieldInsnNode.getOpcode()) {
+                    case Opcodes.GETFIELD:
+                        // The ALOAD 0 is already before the field insn
+                        // insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+
+                        insnList.add(new FieldInsnNode(
+                                Opcodes.GETFIELD,
+                                proxyClass.getInternalName(),
+                                "this$",
+                                Type.getObjectType(targetClass.name).getDescriptor())
+                        );
+                        insnList.add(IndyFactory.getPrivateField(ownerType, fieldInsnNode.name, fieldType));
+
+                        break;
+
+                    case Opcodes.PUTFIELD:
+                        // The ALOAD 0 is already before the field insn
+                        // insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+
+                        insnList.add(new FieldInsnNode(
+                                Opcodes.GETFIELD,
+                                proxyClass.getInternalName(),
+                                "this$",
+                                Type.getObjectType(targetClass.name).getDescriptor())
+                        );
+                        insnList.add(IndyFactory.setPrivateField(ownerType, fieldInsnNode.name, fieldType));
+
+                        break;
+
+                    case Opcodes.GETSTATIC:
+                        //indyNode = IndyFactory.getStaticField(ownerType, fieldInsnNode.name, fieldType);
+
+                        insnList.add(IndyFactory.getStaticField(ownerType, fieldInsnNode.name, fieldType));
+
+                        break;
+
+                    case Opcodes.PUTSTATIC:
+                        insnList.add(IndyFactory.setStaticField(ownerType, fieldInsnNode.name, fieldType));
+
+                        break;
+
+                    default:
+                        throw new UnsupportedOperationException("Unknown field insn opcode: " + fieldInsnNode.getOpcode());
+                }
+
+                addedMethod.instructions.insertBefore(fieldInsnNode, insnList);
+                addedMethod.instructions.remove(fieldInsnNode);
+            }
+        }
     }
 
     @Override
@@ -74,12 +143,15 @@ public class MethodAdded extends Transformation {
         // Transform methods in the original class to refer to the new class
         List<String> targetMethods = new ArrayList<>();
 
+        Type targetType = Type.getObjectType(state.transformed.name);
+        Type proxyType = Type.getObjectType(state.proxy.name);
+
         for (MethodNode addedMethod : state.addedMethods) {
             // Remove all added methods from the original class
             state.transformed.methods.remove(addedMethod);
 
             // Transform them as needed and move them to the proxy class
-            transformAddedMethod(addedMethod);
+            transformAddedMethod(state.transformed, proxyType, addedMethod);
             state.proxy.methods.add(addedMethod);
 
             // Store method in map for transformation step
@@ -94,8 +166,6 @@ public class MethodAdded extends Transformation {
                     MethodInsnNode methodInsnNode = (MethodInsnNode) insn;
 
                     if (methodInsnNode.owner.equals(state.transformed.name) && targetMethods.contains(methodInsnNode.name + methodInsnNode.desc)) {
-                        Type original = Type.getObjectType(methodInsnNode.owner);
-
                         methodInsnNode.owner = state.proxy.name;
 
                         if (methodInsnNode.getOpcode() == Opcodes.INVOKESPECIAL) {
@@ -104,7 +174,7 @@ public class MethodAdded extends Transformation {
 
                             methodInsnNode.setOpcode(Opcodes.INVOKEVIRTUAL);
 
-                            MethodNode thunk = generateStaticProxyThunk(original, methodInsnNode);
+                            MethodNode thunk = generateStaticProxyThunk(targetType, methodInsnNode);
                             state.proxy.methods.add(thunk);
 
                             MethodInsnNode thunkNode = new MethodInsnNode(

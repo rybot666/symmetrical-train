@@ -10,7 +10,10 @@ import java.util.Map;
 /**
  * Bootstrap methods used by generated classes (invokedynamic)
  */
+
+// TODO we should probably get a lookup from the target class on proxy creation but this is slow
 public class PulpBootstrapMethods {
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
     private static final MethodHandle SELF_GET_PROXY_HANDLE;
 
     static {
@@ -30,32 +33,64 @@ public class PulpBootstrapMethods {
     // Method used for indy invocation after map reflectively located from proxy class type
     @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter") // instanceMap is a reflected static
     public static Object getProxyImpl(Map<Object, Object> instanceMap, Constructor<?> ctor, Class<?> desiredInstanceClazz, Object instance) {
+        Object proxyInstance;
+
         synchronized (instanceMap) {
-            Object proxyInstance = instanceMap.get(instance);
+            proxyInstance = instanceMap.get(instance);
+        }
 
-            if (proxyInstance != null) {
-                return proxyInstance;
-            }
+        if (proxyInstance != null) {
+            return proxyInstance;
+        }
 
-            if (!desiredInstanceClazz.isAssignableFrom(instance.getClass())) {
-                throw new AssertionError(String.format("Proxy constructor desired class (%s) is not assignable from actual class (%s)", desiredInstanceClazz, instance.getClass()));
-            }
+        if (!desiredInstanceClazz.isAssignableFrom(instance.getClass())) {
+            throw new AssertionError(String.format("Proxy constructor desired class (%s) is not assignable from actual class (%s)", desiredInstanceClazz, instance.getClass()));
+        }
 
-            try {
-                Object desiredInstance = desiredInstanceClazz.cast(instance);
-                proxyInstance = ctor.newInstance(desiredInstance);
+        try {
+            Object desiredInstance = desiredInstanceClazz.cast(instance);
+            proxyInstance = ctor.newInstance(desiredInstance);
 
-                instanceMap.put(instance, proxyInstance);
-                return proxyInstance;
-            } catch (IllegalAccessException | InstantiationException e) {
-                throw new AssertionError(String.format("Proxy class has invalid or missing constructor (%s)", ctor), e);
-            } catch (InvocationTargetException e) {
-                throw new RuntimeException("Proxy class constructor threw an error", e);
-            }
+            instanceMap.put(instance, proxyInstance);
+            return proxyInstance;
+        } catch (IllegalAccessException | InstantiationException e) {
+            throw new AssertionError(String.format("Proxy class has invalid or missing constructor (%s)", ctor), e);
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException("Proxy class constructor threw an error", e);
         }
     }
 
+    private static MethodHandle getProxyMethodHandle(Class<?> proxyClazz, Class<?> instanceClazz) {
+        // Locate desired constructor
+        Constructor<?>[] ctors = proxyClazz.getDeclaredConstructors();
+        assert ctors.length == 1;
+
+        Constructor<?> ctor = ctors[0];
+
+        Class<?>[] ctorArgs = ctor.getParameterTypes();
+        assert ctorArgs.length == 1;
+
+        Class<?> desiredInstanceClazz = ctorArgs[0];
+
+        assert desiredInstanceClazz.isAssignableFrom(instanceClazz);
+
+        // Proxy classes have an INSTANCES static field with a map of target instance to proxy instance
+        try {
+            Field instancesField = proxyClazz.getDeclaredField("INSTANCES");
+            assert Modifier.isStatic(instancesField.getModifiers());
+
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> instanceMap = (Map<Object, Object>) instancesField.get(null);
+
+            return MethodHandles.insertArguments(SELF_GET_PROXY_HANDLE, 0, instanceMap, ctor, desiredInstanceClazz);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new AssertionError("Invalid proxy class - threw error during get indy", e);
+        }
+    }
+
+
     // Returns a handle that takes a class instance and returns a matching proxy instance
+    // Called as `getProxy(Linstance/here;)Ltarget/proxy/type;`
     public static CallSite getProxy(@SuppressWarnings("unused") MethodHandles.Lookup caller, @SuppressWarnings("unused") String name, MethodType type) {
         // Pull the type of the proxy class from the requested type signature
         Class<?> maybeProxyClazz = type.returnType();
@@ -69,38 +104,62 @@ public class PulpBootstrapMethods {
         // Pull the type of the instance class from the requested type signature
         Class<?> instanceClazz = type.parameterType(0);
 
-        // Locate desired constructor
-        Constructor<?>[] ctors = proxyClazz.getDeclaredConstructors();
+        MethodHandle implHandle = getProxyMethodHandle(proxyClazz, instanceClazz);
 
-        if (ctors.length != 1) {
-            throw new AssertionError(String.format("Proxy class has wrong number of constructors (has %d needs 1)", ctors.length));
-        }
+        return new ConstantCallSite(implHandle.asType(type));
+    }
 
-        Constructor<?> ctor = ctors[0];
-        Class<?>[] ctorArgs = ctor.getParameterTypes();
+    // Collection of methods to get and set private fields of objects
 
-        if (ctorArgs.length != 1) {
-            throw new AssertionError(String.format("Proxy class constructor has wrong number of arguments (has %d needs 1)", ctorArgs.length));
-        }
+    // Called as `getPrivateField(Ltarget/class;)Lfield/type;`
+    // Method name is used as field name
+    public static CallSite getPrivateField(@SuppressWarnings("unused") MethodHandles.Lookup lookup, String name, MethodType type) throws NoSuchFieldException, IllegalAccessException {
+        assert type.parameterCount() == 1;
 
-        Class<?> desiredInstanceClazz = ctorArgs[0];
+        Class<?> targetClass = type.parameterType(0);
+        Class<?> fieldType = type.returnType();
 
-        if (!desiredInstanceClazz.isAssignableFrom(instanceClazz)) {
-            throw new AssertionError(String.format("Proxy class constructor parameter (%s) is not assignable from provided instance class (%s)", desiredInstanceClazz, instanceClazz));
-        }
+        MethodHandle handle = MethodHandles.privateLookupIn(targetClass, LOOKUP)
+                .findGetter(targetClass, name, fieldType);
+        return new ConstantCallSite(handle);
+    }
 
-        // Proxy classes have an INSTANCES static field with a map of target instance to proxy instance
-        try {
-            Field instancesField = proxyClazz.getDeclaredField("INSTANCES");
-            assert Modifier.isStatic(instancesField.getModifiers());
+    // Called as `setPrivateField(Ltarget/class;Lfield/type;)V`
+    // Method name is used as field name
+    public static CallSite setPrivateField(@SuppressWarnings("unused") MethodHandles.Lookup lookup, String name, MethodType type) throws NoSuchFieldException, IllegalAccessException {
+        assert type.parameterCount() == 2;
+        assert type.returnType() == void.class;
 
-            @SuppressWarnings("unchecked")
-            Map<Object, Object> instanceMap = (Map<Object, Object>) instancesField.get(null);
-            MethodHandle implHandle = MethodHandles.insertArguments(SELF_GET_PROXY_HANDLE, 0, instanceMap, ctor, desiredInstanceClazz);
+        Class<?> targetClass = type.parameterType(0);
+        Class<?> fieldType = type.parameterType(1);
 
-            return new ConstantCallSite(implHandle.asType(type));
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new AssertionError("Invalid proxy class - threw error during get indy", e);
-        }
+        MethodHandle handle = MethodHandles.privateLookupIn(targetClass, LOOKUP)
+                .findSetter(targetClass, name, fieldType);
+        return new ConstantCallSite(handle);
+    }
+
+    // Called as `getStaticField()Lfield/type;`
+    // Method name is used as field name
+    public static CallSite getStaticField(@SuppressWarnings("unused") MethodHandles.Lookup lookup, String name, MethodType type, Class<?> targetClass) throws NoSuchFieldException, IllegalAccessException {
+        assert type.parameterCount() == 0;
+
+        Class<?> fieldType = type.returnType();
+
+        MethodHandle handle = MethodHandles.privateLookupIn(targetClass, LOOKUP)
+                .findStaticGetter(targetClass, name, fieldType);
+        return new ConstantCallSite(handle);
+    }
+
+    // Called as `setStaticField(Lfield/type;)V`
+    // Method name is used as field name
+    public static CallSite setStaticField(@SuppressWarnings("unused") MethodHandles.Lookup lookup, String name, MethodType type, Class<?> targetClass) throws NoSuchFieldException, IllegalAccessException {
+        assert type.parameterCount() == 1;
+        assert type.returnType() == void.class;
+
+        Class<?> fieldType = type.parameterType(0);
+
+        MethodHandle handle = MethodHandles.privateLookupIn(targetClass, LOOKUP)
+                .findStaticSetter(targetClass, name, fieldType);
+        return new ConstantCallSite(handle);
     }
 }

@@ -46,7 +46,7 @@ public class HackyClassLoader extends URLClassLoader {
 
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        for (URLClassLoader loader: getLoaders()) {
+        for (URLClassLoader loader: this.getLoaders()) {
             try {
                 return (Class<?>) LOAD_CLASS_0_HANDLE.invoke(loader, name, true, false, true);
             } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
@@ -61,7 +61,7 @@ public class HackyClassLoader extends URLClassLoader {
 
     @Override
     public InputStream getResourceAsStream(String name) {
-        for (URLClassLoader loader: getLoaders()) {
+        for (URLClassLoader loader: this.getLoaders()) {
             InputStream resource = loader.getResourceAsStream(name);
 
             if (resource == null) {

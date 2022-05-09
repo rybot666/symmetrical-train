@@ -55,13 +55,13 @@ public class PulpTransformer implements ClassFileTransformer {
     }
 
     private static void dumpClass(Path target, ClassNode node) throws IOException {
+        ClassWriter writer = new ClassWriter(0);
+        node.accept(writer);
+
         Files.createDirectories(target.getParent());
 
         Files.deleteIfExists(target);
         Files.createFile(target);
-
-        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        node.accept(writer);
 
         Files.write(target, writer.toByteArray(), StandardOpenOption.WRITE);
     }
@@ -101,12 +101,7 @@ public class PulpTransformer implements ClassFileTransformer {
             TRANSFORMATIONS.forEach((t) -> t.apply(state));
 
             // Write and define proxy class
-            ClassWriter proxyWriter = new MixinClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-            state.proxy.accept(proxyWriter);
-
             try {
-                byte[] proxyBytes = proxyWriter.toByteArray();
-
                 if (PulpBootstrap.DEBUG) {
                     try {
                         Path proxyClassPath = Paths.get(".pulp.out", "bytecode", "proxy", transformed.name.concat(".class"));
@@ -118,6 +113,11 @@ public class PulpTransformer implements ClassFileTransformer {
                         LOGGER.log(Level.SEVERE, "IO Exception while outputting generated proxy bytecode", e);
                     }
                 }
+
+                ClassWriter proxyWriter = new MixinClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+                state.proxy.accept(proxyWriter);
+
+                byte[] proxyBytes = proxyWriter.toByteArray();
 
                 @SuppressWarnings("unchecked")
                 Class<? extends ProxyMarker> proxyClazz = (Class<? extends ProxyMarker>) GlobalProxyState.LOOKUP.defineClass(proxyBytes);
