@@ -7,6 +7,7 @@ import io.github.rybot666.pulp.mixin_backend.transformer.transformations.MethodA
 import io.github.rybot666.pulp.mixin_backend.transformer.transformations.Transformation;
 import io.github.rybot666.pulp.mixin_backend.transformer.transformations.TransformationState;
 import io.github.rybot666.pulp.proxies.GlobalProxyState;
+import io.github.rybot666.pulp.util.DebugUtils;
 import io.github.rybot666.pulp.util.Utils;
 import io.github.rybot666.pulp.util.log.LogUtils;
 import io.github.rybot666.pulp.util.log.PulpLogger;
@@ -14,8 +15,6 @@ import org.bukkit.Bukkit;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.util.CheckClassAdapter;
-import org.objectweb.asm.util.TraceClassVisitor;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.transformers.MixinClassWriter;
@@ -44,6 +43,7 @@ import java.util.stream.Collectors;
 //   > Add the interface to the proxy class
 //   > Transform all usages of the class in interface position to use the proxy class
 // - (feat) Access wideners? (this is hard, not part of mixin, would be nice to have tho)
+// - Mixin inheritance causes problems if you aren't careful
 
 public class PulpTransformer implements ClassFileTransformer {
     private static final PulpLogger LOGGER = LogUtils.getLogger("Transformer");
@@ -52,28 +52,6 @@ public class PulpTransformer implements ClassFileTransformer {
 
     public PulpTransformer(PulpMixinService owner) {
         this.owner = owner;
-    }
-
-    private static void dumpClass(Path target, ClassNode node) throws IOException {
-        ClassWriter writer = new ClassWriter(0);
-        node.accept(writer);
-
-        Files.createDirectories(target.getParent());
-
-        Files.deleteIfExists(target);
-        Files.createFile(target);
-
-        Files.write(target, writer.toByteArray(), StandardOpenOption.WRITE);
-    }
-
-    private static void checkAndDumpTrace(Path target, ClassNode node) throws IOException {
-        Files.createDirectories(target.getParent());
-
-        Files.deleteIfExists(target);
-        Files.createFile(target);
-
-        CheckClassAdapter cca = new CheckClassAdapter(new TraceClassVisitor(new PrintWriter(new FileWriter(target.toFile()))));
-        node.accept(cca);
     }
 
     @Override
@@ -107,8 +85,8 @@ public class PulpTransformer implements ClassFileTransformer {
                         Path proxyClassPath = Paths.get(".pulp.out", "bytecode", "proxy", transformed.name.concat(".class"));
                         Path proxyTracePath = Paths.get(".pulp.out", "trace", "proxy", transformed.name.concat(".trace.txt"));
 
-                        dumpClass(proxyClassPath, state.proxy);
-                        checkAndDumpTrace(proxyTracePath, state.proxy);
+                        DebugUtils.dumpClass(proxyClassPath, state.proxy);
+                        DebugUtils.checkAndDumpTrace(proxyTracePath, state.proxy);
                     } catch (IOException e) {
                         LOGGER.log(Level.SEVERE, "IO Exception while outputting generated proxy bytecode", e);
                     }
@@ -144,11 +122,11 @@ public class PulpTransformer implements ClassFileTransformer {
                 Path untransformedTracePath = Paths.get(".pulp.out", "trace", "untransformed", untransformed.name.concat(".trace.txt"));
 
                 try {
-                    dumpClass(transformedClassPath, transformed);
-                    dumpClass(untransformedClassPath, untransformed);
+                    DebugUtils.dumpClass(transformedClassPath, transformed);
+                    DebugUtils.dumpClass(untransformedClassPath, untransformed);
 
-                    checkAndDumpTrace(transformedTracePath, transformed);
-                    checkAndDumpTrace(untransformedTracePath, untransformed);
+                    DebugUtils.checkAndDumpTrace(transformedTracePath, transformed);
+                    DebugUtils.checkAndDumpTrace(untransformedTracePath, untransformed);
                 } catch (IOException e) {
                     LOGGER.log(Level.SEVERE, "IO Exception while outputting generated class bytecode", e);
                 }
