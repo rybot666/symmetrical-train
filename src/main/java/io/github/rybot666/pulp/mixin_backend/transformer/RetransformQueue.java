@@ -5,6 +5,7 @@ import io.github.rybot666.pulp.PulpBootstrap;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class RetransformQueue {
     private Set<Class<?>> current = new HashSet<>();
@@ -18,6 +19,21 @@ public class RetransformQueue {
 
     public boolean isNextEmpty() {
         return this.next.isEmpty();
+    }
+
+    public void handleRetransformationThreads(Consumer<Class<?>> consumer) {
+        while (this.current.isEmpty() && !this.next.isEmpty()) {
+            Set<Class<?>> targets = this.shift();
+
+            Thread thread = new Thread(() -> targets.forEach(consumer));
+            thread.start();
+
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Thread was unexpectedly interrupted", e);
+            }
+        }
     }
 
     public Set<Class<?>> shift() {

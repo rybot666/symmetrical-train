@@ -60,6 +60,8 @@ public class PulpTransformer implements ClassFileTransformer {
     public final FieldDefinalizationRemapper definalizationRemapper = new FieldDefinalizationRemapper();
     public final RetransformQueue retransformQueue = new RetransformQueue();
 
+    private volatile boolean isHandlingRetransforms = false;
+
     public PulpTransformer(PulpMixinService owner) {
         this.owner = owner;
     }
@@ -158,9 +160,14 @@ public class PulpTransformer implements ClassFileTransformer {
             // Check if the current retransform queue is empty and the next one is not
             //
             // If this is the case then we should pop the queue and retransform all targets in the "current" list
-            if (this.retransformQueue.isCurrentEmpty() && !this.retransformQueue.isNextEmpty()) {
-                Set<Class<?>> targets = this.retransformQueue.shift();
-                targets.forEach(this::retransformClass);
+            if (!this.isHandlingRetransforms) {
+                this.isHandlingRetransforms = true;
+
+                try {
+                    this.retransformQueue.handleRetransformationThreads(this::retransformClass);
+                } finally {
+                    this.isHandlingRetransforms = false;
+                }
             }
 
             return writer.toByteArray();
