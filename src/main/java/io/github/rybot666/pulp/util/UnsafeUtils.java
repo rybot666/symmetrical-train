@@ -1,10 +1,8 @@
 package io.github.rybot666.pulp.util;
 
 import io.github.rybot666.pulp.util.reflect.FieldUtils;
-import org.bukkit.Bukkit;
 import sun.misc.Unsafe;
 
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Collection;

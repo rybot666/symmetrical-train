@@ -1,5 +1,7 @@
 package io.github.rybot666.pulp.mixin_backend.transformer.proxy;
 
+import io.github.rybot666.pulp.PulpBootstrap;
+import io.github.rybot666.pulp.util.Constants;
 import io.github.rybot666.pulp.util.Utils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -13,7 +15,7 @@ public class ProxyFactory {
         proxy.name = getProxyClassName(target.getInternalName());
         proxy.access = Opcodes.ACC_SYNTHETIC | Opcodes.ACC_PUBLIC;
         proxy.superName = "java/lang/Object";
-        proxy.version = 60;
+        proxy.version = Constants.JAVA_CLASS_VERSION;
 
         // Add static instances field (map of target instance to their proxy instance)
         Type weakHashType = Type.getType(WeakHashMap.class);
@@ -26,14 +28,16 @@ public class ProxyFactory {
                 null
         ));
 
-        // Debug field
-        proxy.fields.add(new FieldNode(
-                Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
-                "PROXYING_FOR",
-                Type.getDescriptor(String.class),
-                null,
-                target.getInternalName()
-        ));
+        if (PulpBootstrap.DEBUG) {
+            // Debug field
+            proxy.fields.add(new FieldNode(
+                    Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                    "PROXYING_FOR",
+                    Type.getDescriptor(String.class),
+                    null,
+                    target.getInternalName()
+            ));
+        }
 
         // Instance field
         proxy.fields.add(new FieldNode(
@@ -99,9 +103,7 @@ public class ProxyFactory {
     }
 
     public static String getProxyClassName(String name) {
-        String packageName = name.replace("/", "$$");
-
-        return "io/github/rybot666/pulp/proxies/".concat(packageName);
+        return name.concat("$$Proxy");
     }
 
     private ProxyFactory() {

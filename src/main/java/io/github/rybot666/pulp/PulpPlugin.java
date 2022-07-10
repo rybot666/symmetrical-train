@@ -54,7 +54,7 @@ public final class PulpPlugin extends JavaPlugin {
         } catch (InvocationTargetException e) {
             LOGGER.log(Level.SEVERE, "Error occurred during bootstrap! Stopping...", e);
 
-            Bukkit.shutdown();
+            System.exit(1);
             return;
         } catch (ReflectiveOperationException e) {
             throw new AssertionError("Reflection error while loading onto MC classpath", e);

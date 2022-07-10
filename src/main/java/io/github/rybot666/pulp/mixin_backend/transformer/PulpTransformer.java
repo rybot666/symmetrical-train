@@ -2,29 +2,32 @@ package io.github.rybot666.pulp.mixin_backend.transformer;
 
 import io.github.rybot666.pulp.PulpBootstrap;
 import io.github.rybot666.pulp.mixin_backend.service.PulpMixinService;
+import io.github.rybot666.pulp.mixin_backend.transformer.instrumentation_compat.FieldDefinalizationHandler;
+import io.github.rybot666.pulp.mixin_backend.transformer.instrumentation_compat.MethodAdditionHandler;
+import io.github.rybot666.pulp.mixin_backend.transformer.proxy.ProxyFactory;
 import io.github.rybot666.pulp.mixin_backend.transformer.proxy.ProxyMarker;
-import io.github.rybot666.pulp.mixin_backend.transformer.transformations.MethodAdded;
-import io.github.rybot666.pulp.mixin_backend.transformer.transformations.Transformation;
-import io.github.rybot666.pulp.mixin_backend.transformer.transformations.TransformationState;
+import io.github.rybot666.pulp.mixin_backend.transformer.remap.FieldDefinalizationRemapper;
+import io.github.rybot666.pulp.mixin_backend.transformer.remap.MassClassState;
 import io.github.rybot666.pulp.proxies.GlobalProxyState;
 import io.github.rybot666.pulp.util.DebugUtils;
-import io.github.rybot666.pulp.util.Utils;
 import io.github.rybot666.pulp.util.log.LogUtils;
 import io.github.rybot666.pulp.util.log.PulpLogger;
 import org.bukkit.Bukkit;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.transformers.MixinClassWriter;
 
-import java.io.*;
+import java.io.IOException;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.lang.reflect.Field;
-import java.nio.file.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.ProtectionDomain;
 import java.util.*;
 import java.util.logging.Level;
@@ -45,13 +48,38 @@ import java.util.stream.Collectors;
 // - (feat) Access wideners? (this is hard, not part of mixin, would be nice to have tho)
 // - Mixin inheritance causes problems if you aren't careful
 
+/**
+ * The entrypoint of the Pulp transformer chain
+ */
 public class PulpTransformer implements ClassFileTransformer {
     private static final PulpLogger LOGGER = LogUtils.getLogger("Transformer");
-    private static final List<Transformation> TRANSFORMATIONS = Utils.make(new ArrayList<>(), (l) -> l.add(new MethodAdded()));
+
     private final PulpMixinService owner;
+
+    public final MassClassState massClassState = new MassClassState();
+    public final FieldDefinalizationRemapper definalizationRemapper = new FieldDefinalizationRemapper();
+    public final RetransformQueue retransformQueue = new RetransformQueue();
 
     public PulpTransformer(PulpMixinService owner) {
         this.owner = owner;
+    }
+
+    private static void possiblyDumpClass(String kind, ClassNode node) {
+        possiblyDumpClass(kind, node.name, node);
+    }
+
+    private static void possiblyDumpClass(String kind, String name, ClassNode node) {
+        if (PulpBootstrap.DEBUG) {
+            Path classPath = Paths.get(".pulp.out", "bytecode", kind, name.concat(".class"));
+            Path tracePath = Paths.get(".pulp.out", "trace", kind, name.concat(".trace.txt"));
+
+            try {
+                DebugUtils.dumpClass(classPath, node);
+                DebugUtils.checkAndDumpTrace(tracePath, node);
+            } catch (IOException e) {
+                LOGGER.log(Level.SEVERE, String.format("IO Exception while dumping class bytecode (type %s)", kind), e);
+            }
+        }
     }
 
     @Override
@@ -68,71 +96,74 @@ public class PulpTransformer implements ClassFileTransformer {
             ClassNode transformed = new ClassNode();
             untransformed.accept(transformed);
 
-            this.owner.fixer.interfaceCache.applyOptional((c) -> c.processClass(untransformed));
+            // Parse all global state from the class
+            this.massClassState.process(untransformed);
 
-            if (!this.owner.transformer.transformClass(MixinEnvironment.getCurrentEnvironment(), className.replace('/', '.'), transformed)) {
-                return null;
-            }
+            /*
+             * 1) Pass the class into mixin
+             *    - This applies any mixins registered against the class
+             */
+            possiblyDumpClass("untransformed", untransformed);
+            this.owner.transformer.transformClass(MixinEnvironment.getCurrentEnvironment(), className.replace('/', '.'), transformed);
 
-            // Generate and apply class diff
-            TransformationState state = new TransformationState(untransformed, transformed);
-            TRANSFORMATIONS.forEach((t) -> t.apply(state));
+            possiblyDumpClass("post_mixin", transformed);
+
+            /*
+             * 2) Transform output class for Instrumentation compatibility
+             *    - This takes the class bytecode that mixin generates and outputs a class that can be transformed with instrumentation
+             *    - This step may also generate a "proxy" class that stores changes that cannot be applied via instrumentation
+             *    - If any incompatible changes are made, they may register for a global remap
+             *
+             * 3) Perform class remapping
+             *    - If any global changes are registered against this class, they will be applied now
+             */
+            boolean shouldLoadProxy;
+
+            // Handle field definalization
+            ClassNode proxy = ProxyFactory.generateBaseProxy(Type.getObjectType(transformed.name));
+            shouldLoadProxy = FieldDefinalizationHandler.handle(this, untransformed, transformed, proxy);
+
+            // Then possibly remap the proxy and transformed classes to ensure changes apply properly
+            this.definalizationRemapper.remap(transformed);
+            shouldLoadProxy |= this.definalizationRemapper.remap(proxy);
+
+            // And then move over methods to proxy
+            shouldLoadProxy |= MethodAdditionHandler.handle(untransformed, transformed, proxy);
+
+            possiblyDumpClass("transformed", transformed);
 
             // Write and define proxy class
             try {
-                if (PulpBootstrap.DEBUG) {
-                    try {
-                        Path proxyClassPath = Paths.get(".pulp.out", "bytecode", "proxy", transformed.name.concat(".class"));
-                        Path proxyTracePath = Paths.get(".pulp.out", "trace", "proxy", transformed.name.concat(".trace.txt"));
+                if (shouldLoadProxy) {
+                    possiblyDumpClass("proxy", DebugUtils.getOriginalClassName(proxy.name), proxy);
 
-                        DebugUtils.dumpClass(proxyClassPath, state.proxy);
-                        DebugUtils.checkAndDumpTrace(proxyTracePath, state.proxy);
-                    } catch (IOException e) {
-                        LOGGER.log(Level.SEVERE, "IO Exception while outputting generated proxy bytecode", e);
+                    MixinClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+                    proxy.accept(writer);
+
+                    // Classes are loaded lazily because classloaders
+                    byte[] proxyBytes = writer.toByteArray();
+                    synchronized (GlobalProxyState.WAITING_PROXY_CLASSES) {
+                        GlobalProxyState.WAITING_PROXY_CLASSES.put(transformed.name, proxyBytes);
                     }
                 }
-
-                ClassWriter proxyWriter = new MixinClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-                state.proxy.accept(proxyWriter);
-
-                byte[] proxyBytes = proxyWriter.toByteArray();
-
-                @SuppressWarnings("unchecked")
-                Class<? extends ProxyMarker> proxyClazz = (Class<? extends ProxyMarker>) GlobalProxyState.LOOKUP.defineClass(proxyBytes);
-
-                synchronized (GlobalProxyState.PROXY_CLASS_MAP) {
-                    GlobalProxyState.PROXY_CLASS_MAP.put(state.transformed.name, proxyClazz);
-                }
             } catch (Throwable e) {
-                LOGGER.log(Level.SEVERE, e, () -> String.format("Error while defining proxy class for %s", state.transformed.name));
+                LOGGER.log(Level.SEVERE, e, () -> String.format("Error while defining proxy class for %s", transformed.name));
                 Bukkit.shutdown();
             }
 
-            // Write back class bytes and return them
+            // Write back class bytes
             ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            state.transformed.accept(writer);
+            transformed.accept(writer);
 
-            byte[] bytes = writer.toByteArray();
-
-            if (PulpBootstrap.DEBUG) {
-                Path transformedClassPath = Paths.get(".pulp.out", "bytecode", "transformed", transformed.name.concat(".class"));
-                Path transformedTracePath = Paths.get(".pulp.out", "trace", "transformed", transformed.name.concat(".trace.txt"));
-
-                Path untransformedClassPath = Paths.get(".pulp.out", "bytecode", "untransformed", untransformed.name.concat(".class"));
-                Path untransformedTracePath = Paths.get(".pulp.out", "trace", "untransformed", untransformed.name.concat(".trace.txt"));
-
-                try {
-                    DebugUtils.dumpClass(transformedClassPath, transformed);
-                    DebugUtils.dumpClass(untransformedClassPath, untransformed);
-
-                    DebugUtils.checkAndDumpTrace(transformedTracePath, transformed);
-                    DebugUtils.checkAndDumpTrace(untransformedTracePath, untransformed);
-                } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE, "IO Exception while outputting generated class bytecode", e);
-                }
+            // Check if the current retransform queue is empty and the next one is not
+            //
+            // If this is the case then we should pop the queue and retransform all targets in the "current" list
+            if (this.retransformQueue.isCurrentEmpty() && !this.retransformQueue.isNextEmpty()) {
+                Set<Class<?>> targets = this.retransformQueue.shift();
+                targets.forEach(this::retransformClass);
             }
 
-            return bytes;
+            return writer.toByteArray();
         } catch (Throwable th) {
             LOGGER.log(Level.SEVERE, th, () -> String.format("An error occurred during class transformation on %s", className));
             return null;
@@ -156,20 +187,20 @@ public class PulpTransformer implements ClassFileTransformer {
     }
 
     /**
-     * Performs mixin application to all loaded classes
+     * Populates the retransform queue with all mixin-ed loaded classes, and collects class state from all of them
      */
-    public void retransformAllLoadedClasses() {
+    public void processAllLoadedClass() {
+        // Find all transformable classes
         List<Class<?>> transformableClasses = new ArrayList<>();
 
-        for (Class<?> clazz: PulpBootstrap.INSTRUMENTATION.getAllLoadedClasses()) {
-            if (clazz.isSynthetic() || clazz.isPrimitive()) continue;
+        for (Class<?> clazz : PulpBootstrap.INSTRUMENTATION.getAllLoadedClasses()) {
+            if (clazz.isSynthetic() || clazz.isPrimitive() || clazz.isArray() || !PulpBootstrap.INSTRUMENTATION.isModifiableClass(clazz)) continue;
 
             transformableClasses.add(clazz);
         }
 
+        // Search for all mixins applied to the discovered targets
         LOGGER.info(() -> String.format("Searching for mixins to apply (checking %d classes)", transformableClasses.size()));
-
-        // First pass, locate all classes that need a retransform
         Set<Class<?>> retransformTargets = new HashSet<>();
 
         Set<String> allTargets = this.getMixinConfigs().stream()
@@ -177,34 +208,50 @@ public class PulpTransformer implements ClassFileTransformer {
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
 
-        for (Class<?> clazz: transformableClasses) {
+        for (Class<?> clazz : transformableClasses) {
             if (allTargets.contains(clazz.getName())) {
                 LOGGER.fine(() -> String.format("Found mixins for %s", clazz.getName()));
                 retransformTargets.add(clazz);
             }
         }
 
-        // Attempt retransformation of all mixin targets
+        // Push all targets into the retransform queue
         LOGGER.info(() -> String.format("Found %d mixin target classes to retransform", retransformTargets.size()));
+        this.retransformQueue.pushAll(retransformTargets);
+    }
 
-        for (Class<?> clazz: retransformTargets) {
-            try {
-                PulpBootstrap.INSTRUMENTATION.retransformClasses(clazz);
-            } catch (UnmodifiableClassException e) {
-                LOGGER.severe(() -> String.format("Retransformation failure! %s is an unmodifiable class", clazz.getName()));
-            } catch (UnsupportedOperationException e) {
-                LOGGER.severe("********************");
-                LOGGER.severe("Unsupported operation occurred during mixin application!");
-                LOGGER.severe("This means that Pulp has missed an illegal class retransformation - this is a bug. Please report it!");
-                LOGGER.severe("");
-                LOGGER.severe(() -> String.format("Target class: %s. Reason: %s (full trace below)", clazz.getName(), e));
-                LOGGER.log(Level.SEVERE, "********************", e);
-            }
+    public void retransformAllInQueue() {
+        // Retransform everything in the queue
+        Set<Class<?>> targets;
+
+        long start = System.currentTimeMillis();
+        LOGGER.info("Retransforming all classes in queue...");
+
+        targets = this.retransformQueue.shift();
+        LOGGER.info(String.format("Retransforming %d initial classes from queue", targets.size()));
+
+        targets.forEach(this::retransformClass);
+
+        long diff = System.currentTimeMillis() - start;
+        LOGGER.info(() -> String.format("Retransformation complete (took %d ms in %d stages)", diff, this.retransformQueue.getStage()));
+    }
+
+    /**
+     * Retransforms the provided class
+     */
+    public void retransformClass(Class<?> clazz) {
+        try {
+            PulpBootstrap.INSTRUMENTATION.retransformClasses(clazz);
+        } catch (UnmodifiableClassException e) {
+            LOGGER.severe(() -> String.format("Retransformation failure! %s is an unmodifiable class", clazz.getName()));
+        } catch (UnsupportedOperationException e) {
+            LOGGER.severe("********************");
+            LOGGER.severe("Unsupported operation occurred during mixin application!");
+            LOGGER.severe("This means that Pulp has missed an illegal class retransformation - this is a bug. Please report it!");
+            LOGGER.severe("");
+            LOGGER.severe(() -> String.format("Target class: %s. Reason: %s (full trace below)", clazz.getName(), e));
+            LOGGER.log(Level.SEVERE, "********************", e);
         }
-
-        LOGGER.info("Mixin retransformations complete");
-
-        // TODO(rybot666): retransformation of classes that access this is needed in some cases. Will be done as part of the diff process
     }
 
     public static PulpTransformer register(Instrumentation instrumentation, PulpMixinService owner) {

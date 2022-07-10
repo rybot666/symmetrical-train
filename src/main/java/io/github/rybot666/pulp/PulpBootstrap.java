@@ -6,7 +6,6 @@ import io.github.rybot666.pulp.util.log.LogUtils;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import org.bukkit.plugin.Plugin;
 import org.spongepowered.asm.launch.MixinBootstrap;
-import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.service.MixinService;
 
 import java.lang.instrument.Instrumentation;
@@ -45,6 +44,8 @@ public class PulpBootstrap {
 
         // Perform retransformation for existing mixins
         PulpMixinService service = (PulpMixinService) MixinService.getService();
-        service.pulpTransformer.retransformAllLoadedClasses();
+
+        service.pulpTransformer.processAllLoadedClass();
+        service.pulpTransformer.retransformAllInQueue();
     }
 }

@@ -12,6 +12,9 @@ public class GlobalProxyState {
     // Map of internal target name to proxy class info
     public static final Map<String, Class<? extends ProxyMarker>> PROXY_CLASS_MAP = new HashMap<>();
 
+    // Map of internal target name to class bytecode for proxies that haven't been instantiated yet
+    public static final Map<String, byte[]> WAITING_PROXY_CLASSES = new HashMap<>();
+
     private GlobalProxyState() {
         throw new UnsupportedOperationException("Cannot instantiate utility class");
     }

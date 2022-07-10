@@ -2,12 +2,14 @@ package io.github.rybot666.pulp.mixin_backend.service;
 
 import io.github.rybot666.pulp.PulpBootstrap;
 import io.github.rybot666.pulp.mixin_backend.HackyClassLoader;
-import io.github.rybot666.pulp.mixin_backend.transformer.MixinFixer;
 import io.github.rybot666.pulp.mixin_backend.transformer.PulpTransformer;
+import io.github.rybot666.pulp.util.Utils;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.SimplePluginManager;
 import org.bukkit.plugin.java.JavaPluginLoader;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.launch.platform.container.ContainerHandleURI;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
@@ -16,12 +18,15 @@ import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory;
 import org.spongepowered.asm.service.*;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 public class PulpMixinService extends MixinServiceAbstract {
@@ -29,7 +34,6 @@ public class PulpMixinService extends MixinServiceAbstract {
     private static final String JAVA_PLUGIN_LOADER_PATTERN = "\\.jar$";
 
     public final HackyClassLoader hackyClassLoader;
-    public final MixinFixer fixer;
     private final PulpClassProvider classProvider;
     private final IContainerHandle primaryContainer;
 
@@ -39,8 +43,6 @@ public class PulpMixinService extends MixinServiceAbstract {
     public PulpMixinService() {
         this.hackyClassLoader = new HackyClassLoader(this.getClass().getClassLoader(), getPluginLoader());
         this.classProvider = new PulpClassProvider(this);
-
-        this.fixer = new MixinFixer(this);
 
         try {
             this.primaryContainer = new ContainerHandleURI(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
@@ -151,5 +153,13 @@ public class PulpMixinService extends MixinServiceAbstract {
     @Override
     public MixinEnvironment.CompatibilityLevel getMaxCompatibilityLevel() {
         return MixinEnvironment.CompatibilityLevel.JAVA_17;
+    }
+
+    @Override
+    public void init() {
+        // Locate all required global state
+        this.pulpTransformer.massClassState.registerAllClasses(this.hackyClassLoader, PulpBootstrap.INSTRUMENTATION);
+
+        super.init();
     }
 }
